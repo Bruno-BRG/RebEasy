@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant T as Timer local
+    participant APP as App C#
+    participant DB as Cache local
+    participant G as Gmail API
+
+    T->>APP: Dispara atualização
+    APP->>DB: Lê lastHistoryId
+    APP->>G: history.list(startHistoryId)
+    G->>APP: Retorna mudanças
+    APP->>G: messages.get(IDs alterados)
+    G->>APP: Retorna detalhes
+    APP->>DB: Atualiza cache local
+    APP->>APP: Atualiza UI

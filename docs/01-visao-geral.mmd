@@ -1,0 +1,14 @@
+flowchart LR
+    A[Gmail Mailbox] --> B[Gmail API]
+    B --> C[App C# Desktop]
+
+    subgraph PC["Seu computador"]
+        C --> D[OAuth / Autenticação]
+        C --> E[Motor de Sincronização]
+        C --> F[Leitor de Mensagens]
+        C --> G[Parser MIME / HTML / Headers]
+        C --> H[Modelo Interno de Dados]
+        C --> I[Interface Bonita de Visualização]
+        C --> J[Exportador PDF / CSV / JSON]
+        C --> K[Cache / Banco Local]
+    end

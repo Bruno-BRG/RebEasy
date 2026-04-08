@@ -1,0 +1,22 @@
+flowchart TB
+    A[Google OAuth Desktop Login] --> B[Token Store Local]
+    B --> C[Gmail API Client]
+
+    C --> D[Inbox Sync Manager]
+    D --> E[Full Sync Inicial]
+    D --> F[Partial Sync Incremental]
+
+    E --> G[Listagem de IDs]
+    F --> G
+
+    G --> H[Message Fetcher]
+    H --> I[Parser MIME / HTML / Headers]
+    I --> J[Normalizador de Dados]
+    J --> K[Cache / SQLite]
+    J --> L[View Models]
+
+    L --> M[UI de Lista]
+    L --> N[UI de Detalhe]
+    L --> O[Busca / Filtros]
+    L --> P[Exportador PDF]
+    L --> Q[Exportador CSV]
