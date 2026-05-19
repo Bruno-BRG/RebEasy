@@ -1,22 +1,15 @@
 flowchart TB
-    A[Google OAuth Desktop Login] --> B[Token Store Local]
-    B --> C[Gmail API Client]
+    A[Payload ID] --> B[API Payload Import Service]
+    B --> C[RehabEasy Transfer API]
+    C --> D[Payload JSON]
 
-    C --> D[Inbox Sync Manager]
-    D --> E[Full Sync Inicial]
-    D --> F[Partial Sync Incremental]
+    D --> E[Payload Record Mapper]
+    E --> F[Registros Normalizados]
+    F --> G[SQLite Record Store]
+    F --> H[View Models]
 
-    E --> G[Listagem de IDs]
-    F --> G
-
-    G --> H[Message Fetcher]
-    H --> I[Parser MIME / HTML / Headers]
-    I --> J[Normalizador de Dados]
-    J --> K[Cache / SQLite]
-    J --> L[View Models]
-
-    L --> M[UI de Lista]
-    L --> N[UI de Detalhe]
-    L --> O[Busca / Filtros]
-    L --> P[Exportador PDF]
-    L --> Q[Exportador CSV]
+    G --> I[Busca Local]
+    H --> J[UI de Lista]
+    H --> K[UI de Detalhe]
+    H --> L[Exportador PDF]
+    H --> M[Exportador CSV]

@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace RebEasy.App;
+namespace RehabEasy.App;
 
 public partial class App : Application
 {

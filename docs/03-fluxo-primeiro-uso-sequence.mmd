@@ -1,20 +1,12 @@
 sequenceDiagram
-    participant U as Usuário
+    participant U as Usuario
     participant APP as App C# Desktop
-    participant B as Navegador
-    participant O as Google OAuth
-    participant G as Gmail API
-    participant DB as Cache local
+    participant API as RehabEasy Transfer API
+    participant DB as SQLite local
 
-    U->>APP: Clica em "Conectar Gmail"
-    APP->>B: Abre login OAuth
-    B->>O: Usuário autentica e consente
-    O->>APP: Retorna código via loopback local
-    APP->>O: Troca código por tokens
-    APP->>DB: Salva tokens
-    APP->>G: messages.list(...)
-    G->>APP: Retorna IDs
-    APP->>G: messages.get(id...)
-    G->>APP: Retorna mensagens completas
-    APP->>DB: Salva cache e historyId
-    APP->>U: Exibe lista inicial
+    U->>APP: Cola payload_id e clica em Importar payload
+    APP->>API: GET /api/payloads/{id}
+    API->>APP: Retorna payload e marca como consumido
+    APP->>APP: Normaliza registros
+    APP->>DB: Salva registros locais
+    APP->>U: Exibe lista importada

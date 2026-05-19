@@ -1,7 +1,7 @@
-<Window x:Class="RebEasy.App.MainWindow"
+<Window x:Class="RehabEasy.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="RebEasy"
+        Title="RehabEasy"
         Width="1280"
         Height="820"
         MinWidth="960"
@@ -28,29 +28,34 @@
                     <TextBlock FontSize="30"
                                FontWeight="Bold"
                                Foreground="#F7F3EB"
-                               Text="RebEasy" />
+                               Text="RehabEasy" />
                     <TextBlock Margin="0,6,0,0"
                                Foreground="#D7E3D4"
-                               Text="Leitura local e sincronizacao incremental da caixa Gmail." />
+                               Text="Importacao via API e persistencia local dos dados recebidos." />
                     <TextBlock Margin="0,10,0,0"
                                Foreground="#D7E3D4"
-                               Text="Conecte com um clique e continue direto para o consentimento Google." />
+                               Text="Cole o ID do payload, importe pela API e consulte os registros no RehabEasy." />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal">
+                    <TextBox x:Name="PayloadIdTextBox"
+                             Width="330"
+                             Height="38"
+                             Margin="0,0,12,0"
+                             Padding="10,8"
+                             VerticalContentAlignment="Center" />
                     <Button x:Name="RefreshButton"
                             MinWidth="140"
                             Padding="18,10"
                             Margin="0,0,12,0"
-                            IsEnabled="False"
                             Click="RefreshButton_OnClick"
                             Content="Atualizar" />
                     <Button x:Name="ConnectButton"
                             MinWidth="180"
                             Padding="18,10"
                             Click="ConnectButton_OnClick"
-                            Content="Conectar Gmail" />
+                            Content="Importar payload" />
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -64,11 +69,10 @@
                          DockPanel.Dock="Top"
                          Margin="0,0,0,12"
                          Padding="10"
-                         IsEnabled="False"
                          TextChanged="SearchTextBox_OnTextChanged" />
 
                 <ListBox x:Name="MessagesList"
-                         DisplayMemberPath="Subject"
+                         DisplayMemberPath="Title"
                          SelectionChanged="MessagesList_OnSelectionChanged" />
             </DockPanel>
         </Border>
@@ -91,26 +95,26 @@
                            FontSize="28"
                            FontWeight="Bold"
                            Foreground="#1F1F1F"
-                           Text="Selecione um e-mail" />
+                           Text="Selecione um registro" />
 
                 <TextBlock x:Name="MetaText"
                            Grid.Row="1"
                            Margin="0,8,0,0"
                            Foreground="#5C5C5C"
-                           Text="Os detalhes da mensagem aparecem aqui." />
+                           Text="Os detalhes do registro aparecem aqui." />
 
                 <TextBlock x:Name="StatusText"
                            Grid.Row="1"
                            Margin="0,32,0,0"
                            Foreground="#6F7B7A"
-                           Text="Aguardando conexao. Clique em Conectar Gmail para abrir o login Google." />
+                           Text="Aguardando payload. Informe o ID gerado pela API para importar." />
 
                 <ScrollViewer Grid.Row="3"
                               VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="BodyText"
                                TextWrapping="Wrap"
                                Foreground="#252525"
-                               Text="Conecte a conta e rode a primeira sincronizacao para preencher o cache local." />
+                               Text="Os registros importados ficam gravados no SQLite local do RehabEasy." />
                 </ScrollViewer>
 
                 <StackPanel Grid.Row="4"

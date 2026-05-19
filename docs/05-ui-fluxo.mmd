@@ -1,6 +1,8 @@
 flowchart LR
-    A[Filtros / Busca] --> B[Lista de E-mails]
-    B --> C[Detalhe do E-mail]
-    C --> D[Exportar PDF]
-    C --> E[Exportar CSV]
-    C --> F[Exportar JSON]
+    A[Campo Payload ID] --> B[Importar Payload]
+    B --> C[Lista de Registros]
+    D[Busca Local] --> C
+    C --> E[Detalhe do Registro]
+    E --> F[Exportar PDF]
+    E --> G[Exportar CSV]
+    E --> H[Exportar JSON]
