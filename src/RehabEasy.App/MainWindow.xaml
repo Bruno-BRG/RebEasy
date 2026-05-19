@@ -34,28 +34,16 @@
                                Text="Importacao via API e persistencia local dos dados recebidos." />
                     <TextBlock Margin="0,10,0,0"
                                Foreground="#D7E3D4"
-                               Text="Cole o ID do payload, importe pela API e consulte os registros no RehabEasy." />
+                               Text="Clique em Atualizar para buscar automaticamente novos registros da API." />
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal">
-                    <TextBox x:Name="PayloadIdTextBox"
-                             Width="330"
-                             Height="38"
-                             Margin="0,0,12,0"
-                             Padding="10,8"
-                             VerticalContentAlignment="Center" />
                     <Button x:Name="RefreshButton"
-                            MinWidth="140"
-                            Padding="18,10"
-                            Margin="0,0,12,0"
-                            Click="RefreshButton_OnClick"
-                            Content="Atualizar" />
-                    <Button x:Name="ConnectButton"
                             MinWidth="180"
                             Padding="18,10"
-                            Click="ConnectButton_OnClick"
-                            Content="Importar payload" />
+                            Click="RefreshButton_OnClick"
+                            Content="Atualizar" />
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -107,7 +95,7 @@
                            Grid.Row="1"
                            Margin="0,32,0,0"
                            Foreground="#6F7B7A"
-                           Text="Aguardando payload. Informe o ID gerado pela API para importar." />
+                           Text="Clique em Atualizar para buscar novos registros na API." />
 
                 <ScrollViewer Grid.Row="3"
                               VerticalScrollBarVisibility="Auto">

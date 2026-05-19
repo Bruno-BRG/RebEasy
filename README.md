@@ -12,7 +12,7 @@ Aplicativo desktop em C# para consumir payloads da RehabEasy Transfer API, grava
 ## Fluxo do produto
 
 1. Sistema A publica um payload na API usando `POST /api/payloads`.
-2. O RehabEasy recebe o `payload_id` e consome `GET /api/payloads/{id}` com a chave do Sistema B.
+2. O RehabEasy consome automaticamente o proximo payload pendente usando `GET /api/payloads/next` com a chave do Sistema B.
 3. O payload e normalizado para registros locais.
 4. Os dados sao gravados em `%LOCALAPPDATA%\RehabEasy\rehabeasy.db`.
 5. A UI lista, busca e abre o detalhe dos registros persistidos.
@@ -34,4 +34,4 @@ dotnet build
 dotnet run --project .\src\RehabEasy.App\RehabEasy.App.csproj
 ```
 
-Depois de abrir o app, cole o `payload_id` gerado pela API e clique em `Importar payload`.
+Depois de abrir o app, clique em `Atualizar` para buscar e consumir automaticamente o proximo payload pendente na API.

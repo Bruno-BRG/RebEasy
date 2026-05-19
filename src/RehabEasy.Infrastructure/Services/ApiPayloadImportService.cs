@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -34,6 +35,41 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
         request.Headers.Add("X-API-KEY", _systemBApiKey);
 
         using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            string error = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"API retornou {(int)response.StatusCode}: {error}");
+        }
+
+        ApiPayloadEnvelope? envelope = await response.Content.ReadFromJsonAsync<ApiPayloadEnvelope>(JsonOptions, cancellationToken);
+        if (envelope?.Payload is null)
+        {
+            throw new InvalidOperationException("A API retornou um payload vazio ou invalido.");
+        }
+
+        DateTimeOffset importedAt = DateTimeOffset.UtcNow;
+        IReadOnlyList<RehabEasyRecord> records = PayloadRecordMapper.Map(envelope.Id, envelope.Payload, importedAt);
+
+        return new ApiPayloadImportResult
+        {
+            PayloadId = envelope.Id,
+            SourceName = PayloadRecordMapper.GetSourceName(envelope.Payload),
+            ImportedAt = importedAt,
+            Records = records
+        };
+    }
+
+    public async Task<ApiPayloadImportResult?> ImportNextPayloadAsync(CancellationToken cancellationToken)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Get, "api/payloads/next");
+        request.Headers.Add("X-API-KEY", _systemBApiKey);
+
+        using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         if (!response.IsSuccessStatusCode)
         {
             string error = await response.Content.ReadAsStringAsync(cancellationToken);

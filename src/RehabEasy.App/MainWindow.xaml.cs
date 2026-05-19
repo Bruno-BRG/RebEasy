@@ -39,14 +39,9 @@ public partial class MainWindow : Window
         _payloadImportService = importService;
     }
 
-    private async void ConnectButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        await ImportPayloadAsync();
-    }
-
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e)
     {
-        await LoadLocalRecordsAsync();
+        await RefreshFromApiAsync();
     }
 
     private void MessagesList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -68,7 +63,7 @@ public partial class MainWindow : Window
         await LoadLocalRecordsAsync();
     }
 
-    private async Task ImportPayloadAsync()
+    private async Task RefreshFromApiAsync()
     {
         if (_payloadImportService is null)
         {
@@ -81,29 +76,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        string payloadId = PayloadIdTextBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(payloadId))
-        {
-            MessageBox.Show(
-                this,
-                "Informe o ID do payload criado pela API.",
-                "Payload obrigatorio",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
-        }
-
-        ConnectButton.IsEnabled = false;
         RefreshButton.IsEnabled = false;
-        ConnectButton.Content = "Importando...";
-        StatusText.Text = "Consumindo payload na API e gravando no SQLite local...";
+        RefreshButton.Content = "Atualizando...";
+        StatusText.Text = "Buscando proximo payload pendente na API...";
 
         try
         {
-            ApiPayloadImportResult result = await _payloadImportService.ImportPayloadAsync(payloadId, CancellationToken.None);
+            ApiPayloadImportResult? result = await _payloadImportService.ImportNextPayloadAsync(CancellationToken.None);
+            if (result is null)
+            {
+                await LoadLocalRecordsAsync();
+                StatusText.Text = "Nenhum payload novo pendente na API.";
+                return;
+            }
+
             await _recordStore.SaveRecordsAsync(result.Records, CancellationToken.None);
 
-            PayloadIdTextBox.Clear();
             await LoadLocalRecordsAsync();
             MessagesList.SelectedIndex = result.Records.Count > 0 ? 0 : -1;
 
@@ -111,7 +99,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            StatusText.Text = "Falha ao importar payload pela API.";
+            StatusText.Text = "Falha ao atualizar pela API.";
             MessageBox.Show(
                 this,
                 exception.Message,
@@ -121,9 +109,8 @@ public partial class MainWindow : Window
         }
         finally
         {
-            ConnectButton.IsEnabled = true;
             RefreshButton.IsEnabled = true;
-            ConnectButton.Content = "Importar payload";
+            RefreshButton.Content = "Atualizar";
         }
     }
 
@@ -151,8 +138,7 @@ public partial class MainWindow : Window
 
     private void ApplyMissingConfigurationState(string configurationMessage)
     {
-        ConnectButton.IsEnabled = false;
-        PayloadIdTextBox.IsEnabled = false;
+        RefreshButton.IsEnabled = false;
         StatusText.Text = configurationMessage;
         BodyText.Text = $"Configure {SystemBApiKeyEnv} e reinicie o aplicativo para habilitar a importacao.";
     }

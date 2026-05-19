@@ -4,8 +4,8 @@ sequenceDiagram
     participant API as RehabEasy Transfer API
     participant DB as SQLite local
 
-    U->>APP: Cola payload_id e clica em Importar payload
-    APP->>API: GET /api/payloads/{id}
+    U->>APP: Clica em Atualizar
+    APP->>API: GET /api/payloads/next
     API->>APP: Retorna payload e marca como consumido
     APP->>APP: Normaliza registros
     APP->>DB: Salva registros locais
