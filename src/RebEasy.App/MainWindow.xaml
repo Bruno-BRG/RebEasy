@@ -6,127 +6,365 @@
         Height="820"
         MinWidth="960"
         MinHeight="640"
-        Background="#F4F1E8">
-    <Grid Margin="24">
+        Background="#F6F5F0">
+    <Grid Margin="20">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320" />
-            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="20" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="16" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
 
-        <Border Grid.ColumnSpan="3"
-                Padding="24"
-                Background="#183A37"
-                CornerRadius="24">
-            <DockPanel LastChildFill="False">
-                <StackPanel>
-                    <TextBlock FontSize="30"
-                               FontWeight="Bold"
-                               Foreground="#F7F3EB"
-                               Text="RebEasy" />
-                    <TextBlock Margin="0,6,0,0"
-                               Foreground="#D7E3D4"
-                               Text="Leitura local e sincronizacao incremental da caixa Gmail." />
-                    <TextBlock Margin="0,10,0,0"
-                               Foreground="#D7E3D4"
-                               Text="Conecte com um clique e continue direto para o consentimento Google." />
-                </StackPanel>
-
-                <StackPanel DockPanel.Dock="Right"
-                            Orientation="Horizontal">
-                    <Button x:Name="RefreshButton"
-                            MinWidth="140"
-                            Padding="18,10"
-                            Margin="0,0,12,0"
-                            IsEnabled="False"
-                            Click="RefreshButton_OnClick"
-                            Content="Atualizar" />
-                    <Button x:Name="ConnectButton"
-                            MinWidth="180"
-                            Padding="18,10"
-                            Click="ConnectButton_OnClick"
-                            Content="Conectar Gmail" />
-                </StackPanel>
-            </DockPanel>
-        </Border>
-
-        <Border Grid.Row="2"
-                Padding="20"
-                Background="#EFE7D8"
-                CornerRadius="20">
-            <DockPanel>
-                <TextBox x:Name="SearchTextBox"
-                         DockPanel.Dock="Top"
-                         Margin="0,0,0,12"
-                         Padding="10"
-                         IsEnabled="False"
-                         TextChanged="SearchTextBox_OnTextChanged" />
-
-                <ListBox x:Name="MessagesList"
-                         DisplayMemberPath="Subject"
-                         SelectionChanged="MessagesList_OnSelectionChanged" />
-            </DockPanel>
-        </Border>
-
-        <Border Grid.Row="2"
-                Grid.Column="2"
-                Padding="24"
+        <Border Padding="20"
                 Background="#FFFDF8"
-                CornerRadius="20">
+                BorderBrush="#DED8CB"
+                BorderThickness="1"
+                CornerRadius="8">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="3*" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="7*" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#343434"
+                               Text="ID do paciente" />
+                    <TextBox x:Name="PatientIdTextBox"
+                             Grid.Row="2"
+                             Padding="10"
+                             FontSize="16"
+                             MaxLength="40"
+                             PreviewTextInput="PatientIdTextBox_OnPreviewTextInput" />
+                    <TextBlock x:Name="StatusText"
+                               Grid.Row="3"
+                               Margin="0,10,0,0"
+                               Foreground="#6F7B7A"
+                               Text="Aguardando conexao. Clique em Conectar Gmail para abrir o login Google." />
+
+                    <StackPanel Grid.Column="1"
+                                Grid.Row="2"
+                                Margin="16,0,0,0"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                        <Button x:Name="RefreshButton"
+                                MinWidth="110"
+                                Padding="14,9"
+                                Margin="0,0,8,0"
+                                IsEnabled="False"
+                                Click="RefreshButton_OnClick"
+                                Content="Atualizar" />
+                        <Button x:Name="ConnectButton"
+                                MinWidth="150"
+                                Padding="14,9"
+                                Click="ConnectButton_OnClick"
+                                Content="Conectar Gmail" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Grid.Row="2"
+                        Padding="16"
+                        Background="#F0ECE2"
+                        BorderBrush="#DED8CB"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <DockPanel LastChildFill="False">
+                            <TextBlock DockPanel.Dock="Left"
+                                       Margin="0,0,12,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#252525"
+                                       Text="E-mails recebidos" />
+                            <ComboBox x:Name="DateSortComboBox"
+                                      DockPanel.Dock="Right"
+                                      MinWidth="180"
+                                      Padding="8"
+                                      SelectedIndex="0"
+                                      SelectionChanged="DateSortComboBox_OnSelectionChanged">
+                                <ComboBoxItem Content="Data decrescente" />
+                                <ComboBoxItem Content="Data crescente" />
+                            </ComboBox>
+                        </DockPanel>
+
+                        <ListBox x:Name="MessagesList"
+                                 Grid.Row="2"
+                                 BorderBrush="#D4CEC0"
+                                 SelectionChanged="MessagesList_OnSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="130" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Foreground="#1F1F1F"
+                                                       Text="{Binding Subject}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,3,0,0"
+                                                       FontSize="12"
+                                                       Foreground="#666666"
+                                                       Text="{Binding From}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1"
+                                                   Margin="12,0,0,0"
+                                                   HorizontalAlignment="Right"
+                                                   Foreground="#5C5C5C"
+                                                   Text="{Binding ReceivedAt, StringFormat={}{0:g}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="4"
+                        Padding="18"
+                        Background="#FFFFFF"
+                        BorderBrush="#DED8CB"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="SubjectText"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Foreground="#1F1F1F"
+                                   Text="Descricao dos testes realizados" />
+
+                        <TextBlock x:Name="MetaText"
+                                   Grid.Row="1"
+                                   Margin="0,6,0,0"
+                                   Foreground="#5C5C5C"
+                                   Text="Selecione um e-mail para ver os testes informados." />
+
+                        <ScrollViewer Grid.Row="3"
+                                      VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="BodyText"
+                                       TextWrapping="Wrap"
+                                       Foreground="#252525"
+                                       Text="Os testes extraidos dos e-mails recebidos aparecerao aqui." />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="2"
+                Padding="20"
+                Background="#FFFFFF"
+                BorderBrush="#DED8CB"
+                BorderThickness="1"
+                CornerRadius="8">
+            <Grid>
+                <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="16" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock x:Name="SubjectText"
-                           FontSize="28"
-                           FontWeight="Bold"
-                           Foreground="#1F1F1F"
-                           Text="Selecione um e-mail" />
-
-                <TextBlock x:Name="MetaText"
-                           Grid.Row="1"
-                           Margin="0,8,0,0"
-                           Foreground="#5C5C5C"
-                           Text="Os detalhes da mensagem aparecem aqui." />
-
-                <TextBlock x:Name="StatusText"
-                           Grid.Row="1"
-                           Margin="0,32,0,0"
-                           Foreground="#6F7B7A"
-                           Text="Aguardando conexao. Clique em Conectar Gmail para abrir o login Google." />
-
-                <ScrollViewer Grid.Row="3"
-                              VerticalScrollBarVisibility="Auto">
-                    <TextBlock x:Name="BodyText"
-                               TextWrapping="Wrap"
-                               Foreground="#252525"
-                               Text="Conecte a conta e rode a primeira sincronizacao para preencher o cache local." />
-                </ScrollViewer>
-
-                <StackPanel Grid.Row="4"
-                            Orientation="Horizontal">
-                    <Button Margin="0,0,8,0"
-                            Padding="14,8"
-                            Content="Exportar PDF"
-                            IsEnabled="False" />
-                    <Button Margin="0,0,8,0"
-                            Padding="14,8"
-                            Content="Exportar CSV"
-                            IsEnabled="False" />
-                    <Button Padding="14,8"
-                            Content="Exportar JSON"
-                            IsEnabled="False" />
+                <StackPanel>
+                    <TextBlock FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="#1F1F1F"
+                               Text="Graficos dos dados" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#5C5C5C"
+                               Text="Valores de demonstracao ate definirmos os graficos finais." />
                 </StackPanel>
+
+                <Border Grid.Row="2"
+                        Padding="18"
+                        Background="#F7F4EC"
+                        BorderBrush="#D8D1C3"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#252525"
+                                   Text="Resumo TUG" />
+
+                        <Grid Grid.Row="1"
+                              Margin="0,16,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontSize="36"
+                                           FontWeight="Bold"
+                                           Foreground="#183A37"
+                                           Text="11.8s" />
+                                <TextBlock HorizontalAlignment="Center"
+                                           Foreground="#5C5C5C"
+                                           Text="Tempo medio" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontSize="36"
+                                           FontWeight="Bold"
+                                           Foreground="#183A37"
+                                           Text="5" />
+                                <TextBlock HorizontalAlignment="Center"
+                                           Foreground="#5C5C5C"
+                                           Text="Testes" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontSize="36"
+                                           FontWeight="Bold"
+                                           Foreground="#B56A2A"
+                                           Text="Moderado" />
+                                <TextBlock HorizontalAlignment="Center"
+                                           Foreground="#5C5C5C"
+                                           Text="Risco" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ProgressBar Grid.Row="2"
+                                     Height="12"
+                                     Maximum="20"
+                                     Value="11.8" />
+                        <TextBlock Grid.Row="3"
+                                   Margin="0,8,0,0"
+                                   Foreground="#5C5C5C"
+                                   Text="Referencia visual: 0 a 20 segundos" />
+                        <TextBlock Grid.Row="4"
+                                   Margin="0,12,0,0"
+                                   Foreground="#777062"
+                                   Text="Grafico final sera substituido pelos dados calculados dos e-mails." />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="4"
+                        Padding="18"
+                        Background="#F3F7F5"
+                        BorderBrush="#D1DCD8"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="16" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="#252525"
+                                   Text="Indicadores auxiliares" />
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Equilibrio" />
+                            <ProgressBar Grid.Column="1"
+                                         Height="10"
+                                         Maximum="100"
+                                         Value="78" />
+                            <TextBlock Grid.Column="2"
+                                       HorizontalAlignment="Right"
+                                       Text="78%" />
+                        </Grid>
+
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Velocidade" />
+                            <ProgressBar Grid.Column="1"
+                                         Height="10"
+                                         Maximum="100"
+                                         Value="64" />
+                            <TextBlock Grid.Column="2"
+                                       HorizontalAlignment="Right"
+                                       Text="64%" />
+                        </Grid>
+
+                        <Grid Grid.Row="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="120" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="50" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Regularidade" />
+                            <ProgressBar Grid.Column="1"
+                                         Height="10"
+                                         Maximum="100"
+                                         Value="82" />
+                            <TextBlock Grid.Column="2"
+                                       HorizontalAlignment="Right"
+                                       Text="82%" />
+                        </Grid>
+
+                        <TextBlock Grid.Row="7"
+                                   Margin="0,18,0,0"
+                                   Foreground="#65756F"
+                                   TextWrapping="Wrap"
+                                   Text="Espaco reservado para graficos comparativos, tendencia historica e alertas clinicos." />
+                    </Grid>
+                </Border>
             </Grid>
         </Border>
     </Grid>

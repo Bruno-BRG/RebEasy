@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows;
+using System.Windows.Input;
 using System.IO;
 using RebEasy.Domain.Contracts;
 using RebEasy.Domain.Models;
@@ -11,21 +12,28 @@ public partial class MainWindow : Window
 {
     private const string GoogleClientIdEnv = "REBEASY_GOOGLE_CLIENT_ID";
     private const string GoogleClientSecretEnv = "REBEASY_GOOGLE_CLIENT_SECRET";
-    private readonly IGmailSyncService _gmailSyncService;
+    private readonly IGmailSyncService? _gmailSyncService;
     private readonly IMessageCache _messageCache;
-    private const string SearchPlaceholder = "Buscar por assunto, remetente ou trecho";
+    private List<EmailMessage> _currentMessages = [];
 
     public MainWindow()
     {
         InitializeComponent();
 
+        PatientIdTextBox.Text = "PAC2026001";
+        DataObject.AddPastingHandler(PatientIdTextBox, PatientIdTextBox_OnPaste);
+
         string? googleClientId = Environment.GetEnvironmentVariable(GoogleClientIdEnv);
         string? googleClientSecret = Environment.GetEnvironmentVariable(GoogleClientSecretEnv);
+        _messageCache = new InMemoryMessageCache();
+        LoadDemoMessages();
 
         if (string.IsNullOrWhiteSpace(googleClientId) || string.IsNullOrWhiteSpace(googleClientSecret))
         {
-            throw new InvalidOperationException(
-                $"Google OAuth credentials not configured. Set {GoogleClientIdEnv} and {GoogleClientSecretEnv} environment variables.");
+            ConnectButton.IsEnabled = false;
+            StatusText.Text =
+                $"Modo demonstracao. Para conectar o Gmail, defina {GoogleClientIdEnv} e {GoogleClientSecretEnv}.";
+            return;
         }
 
         string tokenDirectory = Path.Combine(
@@ -34,8 +42,7 @@ public partial class MainWindow : Window
             "tokens");
 
         _gmailSyncService = new GmailSyncService(googleClientId, googleClientSecret, tokenDirectory);
-        _messageCache = new InMemoryMessageCache();
-        SearchTextBox.Text = SearchPlaceholder;
+        StatusText.Text = "Dados demonstrativos carregados. Conecte o Gmail para sincronizar mensagens reais.";
     }
 
     private async void ConnectButton_OnClick(object sender, RoutedEventArgs e)
@@ -62,24 +69,50 @@ public partial class MainWindow : Window
             : message.PlainTextBody;
     }
 
-    private async void SearchTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
+    private void DateSortComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_messageCache is null)
+        if (!IsInitialized)
         {
             return;
         }
 
-        string query = SearchTextBox.Text;
-        if (string.Equals(query, SearchPlaceholder, StringComparison.Ordinal))
+        ApplyMessageSort();
+    }
+
+    private void PatientIdTextBox_OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        e.Handled = !IsAlphanumeric(e.Text);
+    }
+
+    private void PatientIdTextBox_OnPaste(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.DataObject.GetDataPresent(DataFormats.Text))
         {
-            query = string.Empty;
+            e.CancelCommand();
+            return;
         }
 
-        MessagesList.ItemsSource = await _messageCache.SearchAsync(query, CancellationToken.None);
+        string pastedText = e.DataObject.GetData(DataFormats.Text) as string ?? string.Empty;
+
+        if (!IsAlphanumeric(pastedText))
+        {
+            e.CancelCommand();
+        }
+    }
+
+    private static bool IsAlphanumeric(string value)
+    {
+        return value.All(char.IsLetterOrDigit);
     }
 
     private async Task SyncMailboxAsync(bool isRefresh)
     {
+        if (_gmailSyncService is null)
+        {
+            StatusText.Text = $"Credenciais Google nao configuradas. Defina {GoogleClientIdEnv} e {GoogleClientSecretEnv}.";
+            return;
+        }
+
         ConnectButton.IsEnabled = false;
         RefreshButton.IsEnabled = false;
         ConnectButton.Content = isRefresh ? "Conectado" : "Sincronizando...";
@@ -103,9 +136,8 @@ public partial class MainWindow : Window
                 },
                 CancellationToken.None);
 
-            MessagesList.ItemsSource = result.Messages;
-            MessagesList.SelectedIndex = result.Messages.Count > 0 ? 0 : -1;
-            SearchTextBox.IsEnabled = true;
+            _currentMessages = result.Messages.ToList();
+            ApplyMessageSort();
             RefreshButton.IsEnabled = true;
             StatusText.Text = isRefresh
                 ? $"Atualizado: {result.AccountEmail} | {result.Messages.Count} emails carregados"
@@ -130,10 +162,92 @@ public partial class MainWindow : Window
             ConnectButton.IsEnabled = true;
             RefreshButton.Content = "Atualizar";
 
-            if (SearchTextBox.IsEnabled)
+            if (_currentMessages.Count > 0 && _gmailSyncService is not null)
             {
                 RefreshButton.IsEnabled = true;
             }
+        }
+    }
+
+    private void LoadDemoMessages()
+    {
+        _currentMessages =
+        [
+            new EmailMessage
+            {
+                Id = "demo-001",
+                ThreadId = "demo-thread-001",
+                Subject = "Relatorio TUG - avaliacao inicial",
+                From = "clinica.demo@rebeasy.local",
+                To = "avaliacao@rebeasy.local",
+                ReceivedAt = DateTimeOffset.Now.AddDays(-1).AddHours(-2),
+                Snippet = "Paciente realizou cinco execucoes do teste TUG.",
+                PlainTextBody =
+                    "Teste TUG - avaliacao inicial\n\n" +
+                    "Execucoes realizadas: 5\n" +
+                    "Tempo medio: 11,8 segundos\n" +
+                    "Melhor tempo: 10,9 segundos\n" +
+                    "Observacoes: paciente levantou sem apoio em quatro execucoes e apresentou pequena oscilacao na virada.\n" +
+                    "Classificacao demonstrativa: risco moderado."
+            },
+            new EmailMessage
+            {
+                Id = "demo-002",
+                ThreadId = "demo-thread-002",
+                Subject = "Relatorio TUG - retorno semanal",
+                From = "fisioterapia.demo@rebeasy.local",
+                To = "avaliacao@rebeasy.local",
+                ReceivedAt = DateTimeOffset.Now.AddDays(-4).AddHours(-1),
+                Snippet = "Retorno com reducao leve no tempo medio.",
+                PlainTextBody =
+                    "Teste TUG - retorno semanal\n\n" +
+                    "Execucoes realizadas: 4\n" +
+                    "Tempo medio: 12,4 segundos\n" +
+                    "Melhor tempo: 11,7 segundos\n" +
+                    "Observacoes: marcha estavel, porem com hesitacao no inicio do movimento.\n" +
+                    "Classificacao demonstrativa: acompanhamento recomendado."
+            },
+            new EmailMessage
+            {
+                Id = "demo-003",
+                ThreadId = "demo-thread-003",
+                Subject = "Relatorio TUG - pre-alta",
+                From = "laboratorio.demo@rebeasy.local",
+                To = "avaliacao@rebeasy.local",
+                ReceivedAt = DateTimeOffset.Now.AddDays(-9).AddHours(-3),
+                Snippet = "Avaliacao de pre-alta com melhora de regularidade.",
+                PlainTextBody =
+                    "Teste TUG - pre-alta\n\n" +
+                    "Execucoes realizadas: 3\n" +
+                    "Tempo medio: 10,6 segundos\n" +
+                    "Melhor tempo: 10,1 segundos\n" +
+                    "Observacoes: execucoes consistentes, sem perda de equilibrio observada.\n" +
+                    "Classificacao demonstrativa: boa evolucao funcional."
+            }
+        ];
+
+        ApplyMessageSort();
+        MessagesList.SelectedIndex = 0;
+    }
+
+    private void ApplyMessageSort()
+    {
+        if (MessagesList is null || DateSortComboBox is null)
+        {
+            return;
+        }
+
+        EmailMessage? selectedMessage = MessagesList.SelectedItem as EmailMessage;
+        bool ascending = DateSortComboBox.SelectedIndex == 1;
+        List<EmailMessage> sortedMessages = ascending
+            ? _currentMessages.OrderBy(message => message.ReceivedAt).ToList()
+            : _currentMessages.OrderByDescending(message => message.ReceivedAt).ToList();
+
+        MessagesList.ItemsSource = sortedMessages;
+
+        if (selectedMessage is not null)
+        {
+            MessagesList.SelectedItem = sortedMessages.FirstOrDefault(message => message.Id == selectedMessage.Id);
         }
     }
 }
