@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     private const string ApiBaseUrlEnv = "REHABEASY_API_BASE_URL";
     private const string SystemBApiKeyEnv = "REHABEASY_SYSTEM_B_API_KEY";
     private const string DefaultApiBaseUrl = "https://telemedicinacc.vercel.app";
+    private const string DefaultSystemBApiKey = "rehabeasy-system-b";
     private const string SearchPlaceholder = "Buscar por titulo, origem, destino ou conteudo";
 
     private readonly IApiPayloadImportService? _payloadImportService;
@@ -161,7 +162,7 @@ public partial class MainWindow : Window
         out string configurationMessage)
     {
         importService = null;
-        string apiKey = Environment.GetEnvironmentVariable(SystemBApiKeyEnv) ?? string.Empty;
+        string apiKey = Environment.GetEnvironmentVariable(SystemBApiKeyEnv) ?? DefaultSystemBApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             configurationMessage = $"API key ausente. Defina {SystemBApiKeyEnv} com a chave do Sistema B.";
