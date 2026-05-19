@@ -59,7 +59,51 @@ public partial class MainWindow : Window
         BodyText.Text = string.IsNullOrWhiteSpace(record.PlainTextContent)
             ? record.RawPayloadJson
             : record.PlainTextContent;
+        DeleteButton.IsEnabled = true;
         UpdateCharts(record);
+    }
+
+    private async void DeleteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (MessagesList.SelectedItem is not RehabEasyRecord record)
+        {
+            DeleteButton.IsEnabled = false;
+            return;
+        }
+
+        MessageBoxResult confirmation = MessageBox.Show(
+            this,
+            $"Apagar o registro \"{record.Title}\" do RehabEasy local?",
+            "Apagar registro",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        DeleteButton.IsEnabled = false;
+
+        try
+        {
+            await _recordStore.DeleteRecordAsync(record.Id, CancellationToken.None);
+            await LoadLocalRecordsAsync();
+            SubjectText.Text = "Descricao dos testes realizados";
+            MetaText.Text = "Selecione um registro para ver os testes informados.";
+            BodyText.Text = "Os testes recebidos da API aparecerao aqui.";
+            StatusText.Text = "Registro apagado do RehabEasy local.";
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = "Falha ao apagar registro.";
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "Erro ao apagar registro",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private void DateSortComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -198,6 +242,7 @@ public partial class MainWindow : Window
 
         if (record is null)
         {
+            DeleteButton.IsEnabled = false;
             AverageTimeText.Text = "--";
             RiskText.Text = "--";
             TugProgressBar.Value = 0;

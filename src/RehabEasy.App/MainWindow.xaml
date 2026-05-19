@@ -61,6 +61,13 @@
                                 Margin="16,0,0,0"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal">
+                        <Button x:Name="DeleteButton"
+                                MinWidth="110"
+                                Padding="14,9"
+                                Margin="0,0,8,0"
+                                IsEnabled="False"
+                                Click="DeleteButton_OnClick"
+                                Content="Apagar" />
                         <Button x:Name="RefreshButton"
                                 MinWidth="130"
                                 Padding="14,9"
