@@ -1,7 +1,9 @@
 using System.Net.Http;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using RehabEasy.Domain.Contracts;
 using RehabEasy.Domain.Models;
 using RehabEasy.Infrastructure.Services;
@@ -14,10 +16,10 @@ public partial class MainWindow : Window
     private const string SystemBApiKeyEnv = "REHABEASY_SYSTEM_B_API_KEY";
     private const string DefaultApiBaseUrl = "https://telemedicinacc.vercel.app";
     private const string DefaultSystemBApiKey = "rehabeasy-system-b";
-    private const string SearchPlaceholder = "Buscar por titulo, origem, destino ou conteudo";
 
     private readonly IApiPayloadImportService? _payloadImportService;
     private readonly IRecordStore _recordStore;
+    private List<RehabEasyRecord> _currentRecords = [];
 
     public MainWindow()
     {
@@ -27,7 +29,8 @@ public partial class MainWindow : Window
         sqliteRecordStore.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         _recordStore = sqliteRecordStore;
 
-        SearchTextBox.Text = SearchPlaceholder;
+        PatientIdTextBox.Text = "PAC2026001";
+        DataObject.AddPastingHandler(PatientIdTextBox, PatientIdTextBox_OnPaste);
         LoadLocalRecordsAsync().GetAwaiter().GetResult();
 
         if (!TryCreateApiPayloadImportService(out IApiPayloadImportService? importService, out string configurationMessage))
@@ -56,11 +59,43 @@ public partial class MainWindow : Window
         BodyText.Text = string.IsNullOrWhiteSpace(record.PlainTextContent)
             ? record.RawPayloadJson
             : record.PlainTextContent;
+        UpdateCharts(record);
     }
 
-    private async void SearchTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
+    private void DateSortComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        await LoadLocalRecordsAsync();
+        if (!IsInitialized)
+        {
+            return;
+        }
+
+        ApplyRecordSort();
+    }
+
+    private void PatientIdTextBox_OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        e.Handled = !IsAlphanumeric(e.Text);
+    }
+
+    private void PatientIdTextBox_OnPaste(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.DataObject.GetDataPresent(DataFormats.Text))
+        {
+            e.CancelCommand();
+            return;
+        }
+
+        string pastedText = e.DataObject.GetData(DataFormats.Text) as string ?? string.Empty;
+
+        if (!IsAlphanumeric(pastedText))
+        {
+            e.CancelCommand();
+        }
+    }
+
+    private static bool IsAlphanumeric(string value)
+    {
+        return value.All(char.IsLetterOrDigit);
     }
 
     private async Task RefreshFromApiAsync()
@@ -121,19 +156,161 @@ public partial class MainWindow : Window
             return;
         }
 
-        string query = SearchTextBox.Text;
-        if (string.Equals(query, SearchPlaceholder, StringComparison.Ordinal))
-        {
-            query = string.Empty;
-        }
-
-        IReadOnlyList<RehabEasyRecord> records = await _recordStore.SearchAsync(query, CancellationToken.None);
-        MessagesList.ItemsSource = records;
+        IReadOnlyList<RehabEasyRecord> records = await _recordStore.SearchAsync(null, CancellationToken.None);
+        _currentRecords = records.ToList();
+        ApplyRecordSort();
 
         if (records.Count == 0)
         {
             StatusText.Text = "Nenhum registro local encontrado.";
+            UpdateCharts(null);
         }
+    }
+
+    private void ApplyRecordSort()
+    {
+        if (MessagesList is null || DateSortComboBox is null)
+        {
+            return;
+        }
+
+        RehabEasyRecord? selectedRecord = MessagesList.SelectedItem as RehabEasyRecord;
+        bool ascending = DateSortComboBox.SelectedIndex == 1;
+        List<RehabEasyRecord> sortedRecords = ascending
+            ? _currentRecords.OrderBy(record => record.ReceivedAt).ToList()
+            : _currentRecords.OrderByDescending(record => record.ReceivedAt).ToList();
+
+        MessagesList.ItemsSource = sortedRecords;
+
+        if (selectedRecord is not null)
+        {
+            MessagesList.SelectedItem = sortedRecords.FirstOrDefault(record => record.Id == selectedRecord.Id);
+        }
+        else if (sortedRecords.Count > 0 && MessagesList.SelectedIndex < 0)
+        {
+            MessagesList.SelectedIndex = 0;
+        }
+    }
+
+    private void UpdateCharts(RehabEasyRecord? record)
+    {
+        TestsCountText.Text = _currentRecords.Count.ToString();
+
+        if (record is null)
+        {
+            AverageTimeText.Text = "--";
+            RiskText.Text = "--";
+            TugProgressBar.Value = 0;
+            DtcProgressBar.Value = 0;
+            DtcText.Text = "--";
+            SpeedProgressBar.Value = 0;
+            SpeedText.Text = "--";
+            StatusProgressBar.Value = 0;
+            StatusIndicatorText.Text = "--";
+            ChartNotesText.Text = "Aguardando registros importados da API.";
+            return;
+        }
+
+        CvTugMetrics metrics = ExtractCvTugMetrics(record.RawPayloadJson);
+        if (metrics.NormalTotalSeconds is double normalSeconds)
+        {
+            AverageTimeText.Text = $"{normalSeconds:0.0}s";
+            TugProgressBar.Value = Math.Clamp(normalSeconds, 0, 20);
+        }
+        else
+        {
+            AverageTimeText.Text = "--";
+            TugProgressBar.Value = 0;
+        }
+
+        RiskText.Text = string.IsNullOrWhiteSpace(metrics.DualTaskStatus) ? "--" : metrics.DualTaskStatus;
+        DtcProgressBar.Value = Math.Clamp(metrics.WorstDualTaskCostPercent ?? 0, 0, 100);
+        DtcText.Text = metrics.WorstDualTaskCostPercent is double dtc ? $"{dtc:0}%" : "--";
+        SpeedProgressBar.Value = Math.Clamp(metrics.NormalWalkSpeedMps ?? 0, 0, 2);
+        SpeedText.Text = metrics.NormalWalkSpeedMps is double speed ? $"{speed:0.00}" : "--";
+        StatusProgressBar.Value = metrics.HasAlert ? 100 : 35;
+        StatusIndicatorText.Text = metrics.HasAlert ? "Alerta" : "OK";
+        ChartNotesText.Text = string.IsNullOrWhiteSpace(metrics.WalkSpeedNote)
+            ? "Indicadores extraidos do payload selecionado."
+            : metrics.WalkSpeedNote;
+    }
+
+    private static CvTugMetrics ExtractCvTugMetrics(string rawPayloadJson)
+    {
+        CvTugMetrics metrics = new();
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(rawPayloadJson);
+            JsonElement root = document.RootElement;
+
+            if (TryGetProperty(root, "assessment", out JsonElement assessment))
+            {
+                if (TryGetProperty(assessment, "conditions", out JsonElement conditions) &&
+                    conditions.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (JsonElement condition in conditions.EnumerateArray())
+                    {
+                        string? code = TryGetString(condition, "code");
+                        if (string.Equals(code, "normal", StringComparison.OrdinalIgnoreCase) &&
+                            TryGetDouble(condition, "total_seconds") is double totalSeconds)
+                        {
+                            metrics.NormalTotalSeconds = totalSeconds;
+                        }
+                    }
+                }
+
+                if (TryGetProperty(assessment, "flags", out JsonElement flags))
+                {
+                    metrics.WorstDualTaskCostPercent = TryGetDouble(flags, "worst_dual_task_cost_percent");
+                    metrics.DualTaskStatus = TryGetString(flags, "dual_task_cost_status");
+                    metrics.NormalWalkSpeedMps = TryGetDouble(flags, "normal_walk_speed_mps");
+                    metrics.WalkSpeedNote = TryGetString(flags, "walk_speed_note");
+                    metrics.HasAlert = metrics.DualTaskStatus?.Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return metrics;
+        }
+
+        return metrics;
+    }
+
+    private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)
+    {
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    private static string? TryGetString(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out JsonElement value) &&
+               value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static double? TryGetDouble(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out JsonElement value))
+        {
+            return null;
+        }
+
+        return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out double parsed)
+            ? parsed
+            : null;
     }
 
     private void ApplyMissingConfigurationState(string configurationMessage)
@@ -178,5 +355,15 @@ public partial class MainWindow : Window
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RehabEasy",
             "rehabeasy.db");
+    }
+
+    private sealed class CvTugMetrics
+    {
+        public double? NormalTotalSeconds { get; set; }
+        public double? WorstDualTaskCostPercent { get; set; }
+        public string? DualTaskStatus { get; set; }
+        public double? NormalWalkSpeedMps { get; set; }
+        public string? WalkSpeedNote { get; set; }
+        public bool HasAlert { get; set; }
     }
 }
