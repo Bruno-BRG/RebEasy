@@ -20,11 +20,11 @@ Aplicativo desktop em C# para consumir payloads da RehabEasy Transfer API, grava
 ## Variaveis de ambiente
 
 ```powershell
-$env:REHABEASY_API_BASE_URL="https://vercel-api-delta-topaz.vercel.app"
+$env:REHABEASY_API_BASE_URL="https://telemedicinacc.vercel.app"
 $env:REHABEASY_SYSTEM_B_API_KEY="SUA_SYSTEM_B_API_KEY"
 ```
 
-`REHABEASY_API_BASE_URL` e opcional. Quando nao for informado, o app usa `https://vercel-api-delta-topaz.vercel.app`.
+`REHABEASY_API_BASE_URL` e opcional. Quando nao for informado, o app usa `https://telemedicinacc.vercel.app`.
 
 ## Rodar localmente
 

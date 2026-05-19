@@ -12,7 +12,7 @@ public partial class MainWindow : Window
 {
     private const string ApiBaseUrlEnv = "REHABEASY_API_BASE_URL";
     private const string SystemBApiKeyEnv = "REHABEASY_SYSTEM_B_API_KEY";
-    private const string DefaultApiBaseUrl = "https://vercel-api-delta-topaz.vercel.app";
+    private const string DefaultApiBaseUrl = "https://telemedicinacc.vercel.app";
     private const string SearchPlaceholder = "Buscar por titulo, origem, destino ou conteudo";
 
     private readonly IApiPayloadImportService? _payloadImportService;
