@@ -305,13 +305,37 @@ public partial class MainWindow : Window
                     }
                 }
 
+                if (TryGetProperty(assessment, "derived_metrics", out JsonElement derivedMetrics))
+                {
+                    metrics.WorstDualTaskCostPercent = TryGetDouble(derivedMetrics, "worst_dual_task_cost_percent");
+                    metrics.NormalWalkSpeedMps = TryGetDouble(derivedMetrics, "normal_walk_speed_mps");
+                }
+
+                if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+                {
+                    if (TryGetProperty(automatedFlags, "dual_task_cost", out JsonElement dualTaskCost))
+                    {
+                        metrics.WorstDualTaskCostPercent ??= TryGetDouble(dualTaskCost, "worst_percent");
+                        metrics.DualTaskStatus = TryGetString(dualTaskCost, "status");
+                    }
+
+                    if (TryGetProperty(automatedFlags, "gait_speed", out JsonElement gaitSpeed))
+                    {
+                        metrics.NormalWalkSpeedMps ??= TryGetDouble(gaitSpeed, "normal_condition_mps");
+                        metrics.WalkSpeedNote = TryGetString(gaitSpeed, "note");
+                    }
+
+                    metrics.HasAlert = metrics.DualTaskStatus?.Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
+                }
+
                 if (TryGetProperty(assessment, "flags", out JsonElement flags))
                 {
-                    metrics.WorstDualTaskCostPercent = TryGetDouble(flags, "worst_dual_task_cost_percent");
-                    metrics.DualTaskStatus = TryGetString(flags, "dual_task_cost_status");
-                    metrics.NormalWalkSpeedMps = TryGetDouble(flags, "normal_walk_speed_mps");
-                    metrics.WalkSpeedNote = TryGetString(flags, "walk_speed_note");
-                    metrics.HasAlert = metrics.DualTaskStatus?.Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
+                    metrics.WorstDualTaskCostPercent ??= TryGetDouble(flags, "worst_dual_task_cost_percent");
+                    metrics.DualTaskStatus ??= TryGetString(flags, "dual_task_cost_status");
+                    metrics.NormalWalkSpeedMps ??= TryGetDouble(flags, "normal_walk_speed_mps");
+                    metrics.WalkSpeedNote ??= TryGetString(flags, "walk_speed_note");
+                    metrics.HasAlert = metrics.HasAlert ||
+                        metrics.DualTaskStatus?.Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
                 }
             }
         }

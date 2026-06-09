@@ -43,6 +43,7 @@ internal static class PayloadRecordMapper
         string title = GetString(record, TitleKeys) ?? $"Registro {index + 1}";
         string summary = GetString(record, SummaryKeys) ?? string.Empty;
         string rawJson = record.GetRawText();
+        string plainTextContent = BuildPlainTextContent(record, summary, rawJson);
 
         return new RehabEasyRecord
         {
@@ -53,11 +54,228 @@ internal static class PayloadRecordMapper
             Recipient = GetString(record, RecipientKeys) ?? "RehabEasy",
             ReceivedAt = GetDate(record, DateKeys) ?? importedAt,
             Summary = summary,
-            PlainTextContent = GetString(record, ContentKeys) ?? summary,
+            PlainTextContent = plainTextContent,
             HtmlContent = GetString(record, HtmlKeys) ?? string.Empty,
             Tags = GetTags(record),
             RawPayloadJson = rawJson
         };
+    }
+
+    private static string BuildPlainTextContent(JsonElement record, string summary, string rawJson)
+    {
+        if (IsCvTugRecord(record))
+        {
+            string cvTugContent = BuildCvTugPlainTextContent(record, summary);
+            if (!string.IsNullOrWhiteSpace(cvTugContent))
+            {
+                return cvTugContent;
+            }
+        }
+
+        return GetString(record, ContentKeys) ?? summary;
+    }
+
+    private static bool IsCvTugRecord(JsonElement record)
+    {
+        string? sender = GetString(record, SenderKeys);
+        if (string.Equals(sender, "CvTUG", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return TryGetProperty(record, "assessment", out _)
+            && TryGetProperty(record, "patient", out _);
+    }
+
+    private static string BuildCvTugPlainTextContent(JsonElement record, string summary)
+    {
+        List<string> sections = [];
+
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            sections.Add(summary.Trim());
+        }
+
+        string? narrative = GetString(record, ContentKeys);
+        if (!string.IsNullOrWhiteSpace(narrative))
+        {
+            sections.Add(narrative.Trim());
+        }
+
+        if (TryGetProperty(record, "patient", out JsonElement patient))
+        {
+            List<string> patientParts = [];
+            AddLabeledValue(patientParts, "Paciente", GetString(patient, "name"));
+            AddLabeledValue(patientParts, "Idade", TryGetIntString(patient, "age_years"));
+            AddLabeledValue(patientParts, "Sexo", GetString(patient, "sex"));
+            AddLabeledValue(patientParts, "ID Externo", GetString(patient, "external_id"));
+
+            if (patientParts.Count > 0)
+            {
+                sections.Add("Paciente:\n" + string.Join('\n', patientParts));
+            }
+        }
+
+        if (TryGetProperty(record, "assessment", out JsonElement assessment))
+        {
+            string? performedAt = GetString(assessment, "performed_at");
+            List<string> metricsLines = [];
+
+            if (!string.IsNullOrWhiteSpace(performedAt))
+            {
+                metricsLines.Add($"Data do exame: {performedAt}");
+            }
+
+            if (TryGetProperty(assessment, "conditions", out JsonElement conditions) &&
+                conditions.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement condition in conditions.EnumerateArray())
+                {
+                    string label = GetString(condition, "label") ?? GetString(condition, "code") ?? "Condicao";
+                    string total = TryGetDoubleString(condition, "total_seconds") ?? "--";
+                    string? dtc = TryGetDoubleString(condition, "dual_task_cost_percent");
+
+                    List<string> phaseParts = [];
+                    if (TryGetProperty(condition, "phases", out JsonElement phases))
+                    {
+                        AddPhaseValue(phaseParts, "Levantar", TryGetDoubleString(phases, "stand_seconds"));
+                        AddPhaseValue(phaseParts, "Marcha", TryGetDoubleString(phases, "walk_seconds"));
+                        AddPhaseValue(phaseParts, "Sentar", TryGetDoubleString(phases, "sit_seconds"));
+                    }
+
+                    string line = $"- {label}: total {total}s";
+                    if (!string.IsNullOrWhiteSpace(dtc))
+                    {
+                        line += $"; DTC {dtc}%";
+                    }
+
+                    if (phaseParts.Count > 0)
+                    {
+                        line += $"; {string.Join("; ", phaseParts)}";
+                    }
+
+                    metricsLines.Add(line);
+                }
+            }
+
+            if (metricsLines.Count > 0)
+            {
+                sections.Add("Resultados:\n" + string.Join('\n', metricsLines));
+            }
+
+            List<string> flagLines = BuildCvTugFlagLines(assessment);
+            if (flagLines.Count > 0)
+            {
+                sections.Add("Sinalizadores:\n" + string.Join('\n', flagLines));
+            }
+
+            if (TryGetProperty(assessment, "methodology_notes", out JsonElement notes) &&
+                notes.ValueKind == JsonValueKind.Array)
+            {
+                List<string> noteLines = notes.EnumerateArray()
+                    .Select(ValueToString)
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .Select(text => $"- {text!}")
+                    .ToList();
+
+                if (noteLines.Count > 0)
+                {
+                    sections.Add("Notas metodologicas:\n" + string.Join('\n', noteLines));
+                }
+            }
+        }
+
+        if (TryGetProperty(record, "source_document", out JsonElement sourceDocument))
+        {
+            List<string> documentLines = [];
+            AddLabeledValue(documentLines, "Arquivo", GetString(sourceDocument, "file_name"));
+            AddLabeledValue(documentLines, "Data no relatorio", GetString(sourceDocument, "report_timestamp_text"));
+
+            if (TryGetProperty(sourceDocument, "notes", out JsonElement notes) &&
+                notes.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement note in notes.EnumerateArray())
+                {
+                    string? text = ValueToString(note);
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        documentLines.Add($"- {text}");
+                    }
+                }
+            }
+
+            if (documentLines.Count > 0)
+            {
+                sections.Add("Documento de origem:\n" + string.Join('\n', documentLines));
+            }
+        }
+
+        return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
+    }
+
+    private static List<string> BuildCvTugFlagLines(JsonElement assessment)
+    {
+        List<string> lines = [];
+
+        if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+        {
+            if (TryGetProperty(automatedFlags, "tug_above_upper_limit", out JsonElement tugUpperFlag))
+            {
+                string? value = ValueToString(tugUpperFlag);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    lines.Add($"- TUG acima do limite superior: {value}");
+                }
+            }
+
+            if (TryGetProperty(automatedFlags, "fall_screening", out JsonElement fallScreening))
+            {
+                string? status = GetString(fallScreening, "status");
+                if (!string.IsNullOrWhiteSpace(status))
+                {
+                    lines.Add($"- Triagem de quedas: {status}");
+                }
+            }
+
+            if (TryGetProperty(automatedFlags, "dual_task_cost", out JsonElement dualTaskCost))
+            {
+                string? status = GetString(dualTaskCost, "status");
+                string? percent = TryGetDoubleString(dualTaskCost, "worst_percent");
+
+                if (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(percent))
+                {
+                    lines.Add($"- Dual-task cost: {status} ({percent}%)");
+                }
+                else if (!string.IsNullOrWhiteSpace(status))
+                {
+                    lines.Add($"- Dual-task cost: {status}");
+                }
+            }
+
+            if (TryGetProperty(automatedFlags, "gait_speed", out JsonElement gaitSpeed))
+            {
+                string? speed = TryGetDoubleString(gaitSpeed, "normal_condition_mps");
+                string? note = GetString(gaitSpeed, "note");
+
+                if (!string.IsNullOrWhiteSpace(speed))
+                {
+                    lines.Add($"- Velocidade media: {speed} m/s");
+                }
+
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    lines.Add($"- Nota velocidade: {note}");
+                }
+            }
+        }
+        else if (TryGetProperty(assessment, "flags", out JsonElement flags))
+        {
+            AddLabeledValue(lines, "- Dual-task cost", GetString(flags, "dual_task_cost_status"));
+            AddLabeledValue(lines, "- Velocidade media", TryGetDoubleString(flags, "normal_walk_speed_mps"), " m/s");
+            AddLabeledValue(lines, "- Nota velocidade", GetString(flags, "walk_speed_note"));
+        }
+
+        return lines;
     }
 
     private static List<JsonElement> ExtractRecordElements(JsonElement payload)
@@ -133,6 +351,24 @@ internal static class PayloadRecordMapper
         return null;
     }
 
+    private static string? TryGetIntString(JsonElement element, string key)
+    {
+        return TryGetProperty(element, key, out JsonElement value) &&
+               value.ValueKind == JsonValueKind.Number &&
+               value.TryGetInt32(out int parsed)
+            ? parsed.ToString(CultureInfo.InvariantCulture)
+            : null;
+    }
+
+    private static string? TryGetDoubleString(JsonElement element, string key)
+    {
+        return TryGetProperty(element, key, out JsonElement value) &&
+               value.ValueKind == JsonValueKind.Number &&
+               value.TryGetDouble(out double parsed)
+            ? parsed.ToString("0.##", CultureInfo.InvariantCulture)
+            : null;
+    }
+
     private static DateTimeOffset? GetDate(JsonElement record, params string[] keys)
     {
         string? rawDate = GetString(record, keys);
@@ -181,6 +417,22 @@ internal static class PayloadRecordMapper
     private static string? TagToString(JsonElement value)
     {
         return ValueToString(value);
+    }
+
+    private static void AddLabeledValue(List<string> lines, string label, string? value, string suffix = "")
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            lines.Add($"{label}: {value}{suffix}");
+        }
+    }
+
+    private static void AddPhaseValue(List<string> parts, string label, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            parts.Add($"{label} {value}s");
+        }
     }
 
     private static string CreateStableRecordId(string payloadId, string sourceId, int index)
