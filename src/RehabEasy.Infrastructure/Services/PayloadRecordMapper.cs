@@ -185,31 +185,6 @@ internal static class PayloadRecordMapper
             }
         }
 
-        if (TryGetProperty(record, "source_document", out JsonElement sourceDocument))
-        {
-            List<string> documentLines = [];
-            AddLabeledValue(documentLines, "Arquivo", GetString(sourceDocument, "file_name"));
-            AddLabeledValue(documentLines, "Data no relatorio", GetString(sourceDocument, "report_timestamp_text"));
-
-            if (TryGetProperty(sourceDocument, "notes", out JsonElement notes) &&
-                notes.ValueKind == JsonValueKind.Array)
-            {
-                foreach (JsonElement note in notes.EnumerateArray())
-                {
-                    string? text = ValueToString(note);
-                    if (!string.IsNullOrWhiteSpace(text))
-                    {
-                        documentLines.Add($"- {text}");
-                    }
-                }
-            }
-
-            if (documentLines.Count > 0)
-            {
-                sections.Add("Documento de origem:\n" + string.Join('\n', documentLines));
-            }
-        }
-
         return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
     }
 
