@@ -21,10 +21,10 @@ Aplicativo desktop em C# para consumir payloads da RehabEasy Transfer API, grava
 
 ```powershell
 $env:REHABEASY_API_BASE_URL="https://telemedicinacc.vercel.app"
-$env:REHABEASY_SYSTEM_B_API_KEY="rehabeasy-system-b"
+$env:REHABEASY_SYSTEM_B_API_KEY="rehabeasy-sistema"
 ```
 
-As duas variaveis sao opcionais para o fluxo padrao. Quando nao forem informadas, o app usa `https://telemedicinacc.vercel.app` e a chave estatica `rehabeasy-system-b`.
+As duas variaveis sao opcionais para o fluxo padrao. Quando nao forem informadas, o app usa `https://telemedicinacc.vercel.app` e a chave estatica `rehabeasy-sistema`.
 
 ## Rodar localmente
 

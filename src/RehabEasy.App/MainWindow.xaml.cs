@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     private const string ApiBaseUrlEnv = "REHABEASY_API_BASE_URL";
     private const string SystemBApiKeyEnv = "REHABEASY_SYSTEM_B_API_KEY";
     private const string DefaultApiBaseUrl = "https://telemedicinacc.vercel.app";
-    private const string DefaultSystemBApiKey = "rehabeasy-system-b";
+    private const string DefaultSystemBApiKey = "rehabeasy-sistema";
 
     private readonly IApiPayloadImportService? _payloadImportService;
     private readonly IRecordStore _recordStore;
