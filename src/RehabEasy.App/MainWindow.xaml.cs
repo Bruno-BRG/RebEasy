@@ -243,6 +243,7 @@ public partial class MainWindow : Window
         if (record is null)
         {
             DeleteButton.IsEnabled = false;
+            ResetChartLabels();
             AverageTimeText.Text = "--";
             RiskText.Text = "--";
             TugProgressBar.Value = 0;
@@ -256,7 +257,40 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (TryExtractEquilibrioMetrics(record.RawPayloadJson, out EquilibrioMetrics equilibrioMetrics))
+        {
+            ApplyEquilibrioChartLabels();
+            AverageTimeText.Text = equilibrioMetrics.SplMm is double spl ? $"{spl:0.#} mm" : "--";
+            TugProgressBar.Maximum = 500;
+            TugProgressBar.Value = Math.Clamp(equilibrioMetrics.SplMm ?? 0, 0, 500);
+
+            RiskText.Text = string.IsNullOrWhiteSpace(equilibrioMetrics.VisualDependencyStatus)
+                ? "--"
+                : equilibrioMetrics.VisualDependencyStatus;
+
+            DtcProgressBar.Maximum = 4;
+            DtcProgressBar.Value = Math.Clamp(equilibrioMetrics.RombergAreaQuotient ?? 0, 0, 4);
+            DtcText.Text = equilibrioMetrics.RombergAreaQuotient is double romberg
+                ? $"{romberg:0.##}"
+                : "--";
+
+            SpeedProgressBar.Maximum = 30;
+            SpeedProgressBar.Value = Math.Clamp(equilibrioMetrics.MeanOscillationVelocityMmS ?? 0, 0, 30);
+            SpeedText.Text = equilibrioMetrics.MeanOscillationVelocityMmS is double velocity
+                ? $"{velocity:0.##}"
+                : "--";
+
+            StatusProgressBar.Value = equilibrioMetrics.HasAlert ? 100 : 35;
+            StatusIndicatorText.Text = equilibrioMetrics.HasAlert ? "Alerta" : "OK";
+            ChartNotesText.Text = string.IsNullOrWhiteSpace(equilibrioMetrics.InterpretationNote)
+                ? "Indicadores extraidos do relatorio de equilibrio selecionado."
+                : equilibrioMetrics.InterpretationNote;
+            return;
+        }
+
+        ApplyCvTugChartLabels();
         CvTugMetrics metrics = ExtractCvTugMetrics(record.RawPayloadJson);
+        TugProgressBar.Maximum = 20;
         if (metrics.NormalTotalSeconds is double normalSeconds)
         {
             AverageTimeText.Text = $"{normalSeconds:0.0}s";
@@ -269,8 +303,10 @@ public partial class MainWindow : Window
         }
 
         RiskText.Text = string.IsNullOrWhiteSpace(metrics.DualTaskStatus) ? "--" : metrics.DualTaskStatus;
+        DtcProgressBar.Maximum = 100;
         DtcProgressBar.Value = Math.Clamp(metrics.WorstDualTaskCostPercent ?? 0, 0, 100);
         DtcText.Text = metrics.WorstDualTaskCostPercent is double dtc ? $"{dtc:0}%" : "--";
+        SpeedProgressBar.Maximum = 2;
         SpeedProgressBar.Value = Math.Clamp(metrics.NormalWalkSpeedMps ?? 0, 0, 2);
         SpeedText.Text = metrics.NormalWalkSpeedMps is double speed ? $"{speed:0.00}" : "--";
         StatusProgressBar.Value = metrics.HasAlert ? 100 : 35;
@@ -278,6 +314,98 @@ public partial class MainWindow : Window
         ChartNotesText.Text = string.IsNullOrWhiteSpace(metrics.WalkSpeedNote)
             ? "Indicadores extraidos do payload selecionado."
             : metrics.WalkSpeedNote;
+    }
+
+    private void ResetChartLabels()
+    {
+        SummaryTitleText.Text = "Resumo";
+        PrimaryMetricLabelText.Text = "Indicador principal";
+        PrimaryMetricReferenceText.Text = "Referencia visual conforme o tipo de exame.";
+        DtcLabelText.Text = "Indicador 1";
+        SpeedLabelText.Text = "Indicador 2";
+        TugProgressBar.Maximum = 20;
+        DtcProgressBar.Maximum = 100;
+        SpeedProgressBar.Maximum = 2;
+    }
+
+    private void ApplyCvTugChartLabels()
+    {
+        SummaryTitleText.Text = "Resumo TUG";
+        PrimaryMetricLabelText.Text = "Tempo normal";
+        PrimaryMetricReferenceText.Text = "Referencia visual: 0 a 20 segundos";
+        DtcLabelText.Text = "DTC pior";
+        SpeedLabelText.Text = "Velocidade";
+    }
+
+    private void ApplyEquilibrioChartLabels()
+    {
+        SummaryTitleText.Text = "Resumo Equilibrio";
+        PrimaryMetricLabelText.Text = "SPL (mm)";
+        PrimaryMetricReferenceText.Text = "Referencia visual: 0 a 500 mm";
+        DtcLabelText.Text = "Romberg area";
+        SpeedLabelText.Text = "Velocidade mm/s";
+    }
+
+    private static bool TryExtractEquilibrioMetrics(string rawPayloadJson, out EquilibrioMetrics metrics)
+    {
+        metrics = new EquilibrioMetrics();
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(rawPayloadJson);
+            JsonElement root = document.RootElement;
+
+            if (!TryGetProperty(root, "assessment", out JsonElement assessment) ||
+                !TryGetProperty(assessment, "posturographic_indices", out _))
+            {
+                return false;
+            }
+
+            if (TryGetProperty(assessment, "derived_metrics", out JsonElement derivedMetrics))
+            {
+                metrics.SplMm = TryGetDouble(derivedMetrics, "spl_mm");
+                metrics.MeanOscillationVelocityMmS = TryGetDouble(
+                    derivedMetrics,
+                    "mean_oscillation_velocity_mm_s");
+                metrics.RombergAreaQuotient = TryGetDouble(derivedMetrics, "romberg_area_quotient");
+            }
+
+            if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+            {
+                if (TryGetProperty(automatedFlags, "visual_dependency", out JsonElement visualDependency))
+                {
+                    metrics.VisualDependencyStatus = TryGetString(visualDependency, "status");
+                    metrics.RombergAreaQuotient ??= TryGetDouble(visualDependency, "romberg_area_quotient");
+                    metrics.HasAlert = metrics.VisualDependencyStatus?
+                        .Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
+                }
+
+                metrics.HasAlert = metrics.HasAlert ||
+                    TryGetBool(automatedFlags, "increased_postural_sway") == true;
+            }
+
+            metrics.InterpretationNote = TryGetString(assessment, "interpretation");
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool? TryGetBool(JsonElement element, string propertyName)
+    {
+        if (!TryGetProperty(element, propertyName, out JsonElement value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null
+        };
     }
 
     private static CvTugMetrics ExtractCvTugMetrics(string rawPayloadJson)
@@ -433,6 +561,16 @@ public partial class MainWindow : Window
         public string? DualTaskStatus { get; set; }
         public double? NormalWalkSpeedMps { get; set; }
         public string? WalkSpeedNote { get; set; }
+        public bool HasAlert { get; set; }
+    }
+
+    private sealed class EquilibrioMetrics
+    {
+        public double? SplMm { get; set; }
+        public double? MeanOscillationVelocityMmS { get; set; }
+        public double? RombergAreaQuotient { get; set; }
+        public string? VisualDependencyStatus { get; set; }
+        public string? InterpretationNote { get; set; }
         public bool HasAlert { get; set; }
     }
 }

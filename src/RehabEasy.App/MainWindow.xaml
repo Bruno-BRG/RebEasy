@@ -220,7 +220,8 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock FontSize="18"
+                        <TextBlock x:Name="SummaryTitleText"
+                                   FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="#252525"
                                    Text="Resumo TUG" />
@@ -240,7 +241,8 @@
                                            FontWeight="Bold"
                                            Foreground="#183A37"
                                            Text="--" />
-                                <TextBlock HorizontalAlignment="Center"
+                                <TextBlock x:Name="PrimaryMetricLabelText"
+                                           HorizontalAlignment="Center"
                                            Foreground="#5C5C5C"
                                            Text="Tempo normal" />
                             </StackPanel>
@@ -277,7 +279,8 @@
                                      Height="12"
                                      Maximum="20"
                                      Value="0" />
-                        <TextBlock Grid.Row="3"
+                        <TextBlock x:Name="PrimaryMetricReferenceText"
+                                   Grid.Row="3"
                                    Margin="0,8,0,0"
                                    Foreground="#5C5C5C"
                                    Text="Referencia visual: 0 a 20 segundos" />
@@ -317,7 +320,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
+                            <TextBlock x:Name="DtcLabelText"
+                                       VerticalAlignment="Center"
                                        Text="DTC pior" />
                             <ProgressBar x:Name="DtcProgressBar"
                                          Grid.Column="1"
@@ -336,7 +340,8 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
+                            <TextBlock x:Name="SpeedLabelText"
+                                       VerticalAlignment="Center"
                                        Text="Velocidade" />
                             <ProgressBar x:Name="SpeedProgressBar"
                                          Grid.Column="1"

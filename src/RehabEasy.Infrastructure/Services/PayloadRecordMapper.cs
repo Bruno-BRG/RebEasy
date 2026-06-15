@@ -63,6 +63,15 @@ internal static class PayloadRecordMapper
 
     private static string BuildPlainTextContent(JsonElement record, string summary, string rawJson)
     {
+        if (IsEquilibrioRecord(record))
+        {
+            string equilibrioContent = BuildEquilibrioPlainTextContent(record, summary);
+            if (!string.IsNullOrWhiteSpace(equilibrioContent))
+            {
+                return equilibrioContent;
+            }
+        }
+
         if (IsCvTugRecord(record))
         {
             string cvTugContent = BuildCvTugPlainTextContent(record, summary);
@@ -75,6 +84,18 @@ internal static class PayloadRecordMapper
         return GetString(record, ContentKeys) ?? summary;
     }
 
+    private static bool IsEquilibrioRecord(JsonElement record)
+    {
+        string? sender = GetString(record, SenderKeys);
+        if (string.Equals(sender, "Posturografia VR", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return TryGetProperty(record, "assessment", out JsonElement assessment) &&
+               TryGetProperty(assessment, "posturographic_indices", out _);
+    }
+
     private static bool IsCvTugRecord(JsonElement record)
     {
         string? sender = GetString(record, SenderKeys);
@@ -83,8 +104,9 @@ internal static class PayloadRecordMapper
             return true;
         }
 
-        return TryGetProperty(record, "assessment", out _)
-            && TryGetProperty(record, "patient", out _);
+        return TryGetProperty(record, "assessment", out JsonElement assessment) &&
+               TryGetProperty(assessment, "conditions", out _) &&
+               TryGetProperty(record, "patient", out _);
     }
 
     private static string BuildCvTugPlainTextContent(JsonElement record, string summary)
@@ -186,6 +208,234 @@ internal static class PayloadRecordMapper
         }
 
         return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
+    }
+
+    private static string BuildEquilibrioPlainTextContent(JsonElement record, string summary)
+    {
+        List<string> sections = [];
+
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            sections.Add(summary.Trim());
+        }
+
+        string? narrative = GetString(record, ContentKeys);
+        if (!string.IsNullOrWhiteSpace(narrative))
+        {
+            sections.Add(narrative.Trim());
+        }
+
+        if (TryGetProperty(record, "patient", out JsonElement patient))
+        {
+            List<string> patientParts = [];
+            AddLabeledValue(patientParts, "Paciente", GetString(patient, "name"));
+            AddLabeledValue(patientParts, "Idade", TryGetIntString(patient, "age_years"));
+            AddLabeledValue(patientParts, "Sexo", GetString(patient, "sex"));
+            AddLabeledValue(patientParts, "ID Exame", GetString(patient, "external_id"));
+
+            if (patientParts.Count > 0)
+            {
+                sections.Add("Paciente:\n" + string.Join('\n', patientParts));
+            }
+        }
+
+        if (TryGetProperty(record, "assessment", out JsonElement assessment))
+        {
+            string? performedAt = GetString(assessment, "performed_at");
+            string? examId = GetString(assessment, "exam_id");
+            List<string> headerLines = [];
+
+            if (!string.IsNullOrWhiteSpace(performedAt))
+            {
+                headerLines.Add($"Data do exame: {performedAt}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(examId))
+            {
+                headerLines.Add($"ID exame: {examId}");
+            }
+
+            if (TryGetProperty(assessment, "protocol", out JsonElement protocol))
+            {
+                AddLabeledValue(headerLines, "Protocolo", GetString(protocol, "description"));
+            }
+
+            if (headerLines.Count > 0)
+            {
+                sections.Add(string.Join('\n', headerLines));
+            }
+
+            if (TryGetProperty(assessment, "posturographic_indices", out JsonElement indices) &&
+                indices.ValueKind == JsonValueKind.Array)
+            {
+                List<string> indexLines = indices.EnumerateArray()
+                    .Select(BuildEquilibrioIndexLine)
+                    .Where(line => !string.IsNullOrWhiteSpace(line))
+                    .Select(line => $"- {line!}")
+                    .ToList();
+
+                if (indexLines.Count > 0)
+                {
+                    sections.Add("Indices posturograficos:\n" + string.Join('\n', indexLines));
+                }
+            }
+
+            if (TryGetProperty(assessment, "romberg_quotients", out JsonElement romberg) &&
+                romberg.ValueKind == JsonValueKind.Array)
+            {
+                List<string> rombergLines = romberg.EnumerateArray()
+                    .Select(BuildRombergQuotientLine)
+                    .Where(line => !string.IsNullOrWhiteSpace(line))
+                    .Select(line => $"- {line!}")
+                    .ToList();
+
+                if (rombergLines.Count > 0)
+                {
+                    sections.Add("Quocientes de Romberg:\n" + string.Join('\n', rombergLines));
+                }
+            }
+
+            List<string> flagLines = BuildEquilibrioFlagLines(assessment);
+            if (flagLines.Count > 0)
+            {
+                sections.Add("Sinalizadores:\n" + string.Join('\n', flagLines));
+            }
+
+            string? interpretation = GetString(assessment, "interpretation");
+            if (!string.IsNullOrWhiteSpace(interpretation))
+            {
+                sections.Add("Interpretacao:\n" + interpretation.Trim());
+            }
+
+            if (TryGetProperty(assessment, "methodology_notes", out JsonElement notes) &&
+                notes.ValueKind == JsonValueKind.Array)
+            {
+                List<string> noteLines = notes.EnumerateArray()
+                    .Select(ValueToString)
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .Select(text => $"- {text!}")
+                    .ToList();
+
+                if (noteLines.Count > 0)
+                {
+                    sections.Add("Notas metodologicas:\n" + string.Join('\n', noteLines));
+                }
+            }
+        }
+
+        return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
+    }
+
+    private static string? BuildEquilibrioIndexLine(JsonElement index)
+    {
+        string label = GetString(index, "label") ?? GetString(index, "code") ?? "Indice";
+        string? value = TryGetDoubleString(index, "value");
+        string? unit = GetString(index, "unit");
+        string? classification = GetString(index, "classification");
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string line = string.IsNullOrWhiteSpace(unit) ? $"{label}: {value}" : $"{label}: {value} {unit}";
+        if (!string.IsNullOrWhiteSpace(classification) &&
+            !string.Equals(classification, "not_classified", StringComparison.OrdinalIgnoreCase))
+        {
+            line += $" ({FormatClassification(classification)})";
+        }
+
+        return line;
+    }
+
+    private static string? BuildRombergQuotientLine(JsonElement quotient)
+    {
+        string label = GetString(quotient, "label") ?? GetString(quotient, "code") ?? "Romberg";
+        string? value = TryGetDoubleString(quotient, "value");
+        string? classification = GetString(quotient, "classification");
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string line = $"{label}: {value}";
+        if (!string.IsNullOrWhiteSpace(classification))
+        {
+            line += $" ({FormatClassification(classification)})";
+        }
+
+        return line;
+    }
+
+    private static List<string> BuildEquilibrioFlagLines(JsonElement assessment)
+    {
+        List<string> lines = [];
+
+        if (!TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+        {
+            return lines;
+        }
+
+        if (TryGetProperty(automatedFlags, "increased_postural_sway", out JsonElement swayFlag))
+        {
+            string? value = ValueToString(swayFlag);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                lines.Add($"- Oscilacao postural aumentada: {value}");
+            }
+        }
+
+        if (TryGetProperty(automatedFlags, "visual_dependency", out JsonElement visualDependency))
+        {
+            string? status = GetString(visualDependency, "status");
+            string? romberg = TryGetDoubleString(visualDependency, "romberg_area_quotient");
+
+            if (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(romberg))
+            {
+                lines.Add($"- Dependencia visual: {status} (Romberg area {romberg})");
+            }
+            else if (!string.IsNullOrWhiteSpace(status))
+            {
+                lines.Add($"- Dependencia visual: {status}");
+            }
+        }
+
+        if (TryGetProperty(automatedFlags, "lateral_predominance", out JsonElement lateralFlag))
+        {
+            string? value = ValueToString(lateralFlag);
+            if (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                lines.Add("- Predominio medio-lateral observado");
+            }
+        }
+
+        if (TryGetProperty(automatedFlags, "acquisition_warnings", out JsonElement warnings) &&
+            warnings.ValueKind == JsonValueKind.Array)
+        {
+            foreach (JsonElement warning in warnings.EnumerateArray())
+            {
+                string? text = ValueToString(warning);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    lines.Add($"- Aviso: {text}");
+                }
+            }
+        }
+
+        return lines;
+    }
+
+    private static string FormatClassification(string classification)
+    {
+        return classification switch
+        {
+            "within_expected" => "dentro do esperado",
+            "above_expected" => "acima do esperado",
+            "below_expected" => "abaixo do esperado",
+            "borderline" => "faixa limitrofe",
+            _ => classification.Replace('_', ' ')
+        };
     }
 
     private static List<string> BuildCvTugFlagLines(JsonElement assessment)
