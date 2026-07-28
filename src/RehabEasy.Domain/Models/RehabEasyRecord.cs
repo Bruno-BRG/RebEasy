@@ -15,4 +15,5 @@ public sealed class RehabEasyRecord
     public string RawPayloadJson { get; init; } = "{}";
     public string PatientId { get; init; } = string.Empty;
     public string TestType { get; init; } = string.Empty;
+    public string PdfLocalPath { get; init; } = string.Empty;
 }

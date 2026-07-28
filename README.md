@@ -11,11 +11,11 @@ Aplicativo desktop em C# para consumir payloads da RehabEasy Transfer API, grava
 
 ## Fluxo do produto
 
-1. Sistema A publica um payload na API usando `POST /api/payloads`.
+1. Sistema A publica JSON em `POST /api/payloads` ou PDF em `POST /api/payloads/pdf`.
 2. O RehabEasy consome automaticamente o proximo payload pendente usando `GET /api/payloads/next` com a chave do Sistema B.
-3. O payload e normalizado para registros locais.
+3. O payload e normalizado para registros locais; se houver `pdf_url`, o PDF e baixado para `%LOCALAPPDATA%\RehabEasy\pdfs\`.
 4. Os dados sao gravados em `%LOCALAPPDATA%\RehabEasy\rehabeasy.db`.
-5. A UI lista, busca e abre o detalhe dos registros persistidos.
+5. A UI mostra o PDF do exame, os graficos clinicos e o prontuario editavel.
 
 ## Variaveis de ambiente
 

@@ -57,6 +57,7 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
 
         await EnsureColumnAsync(connection, cancellationToken, "records", "patient_id", "TEXT NOT NULL DEFAULT ''");
         await EnsureColumnAsync(connection, cancellationToken, "records", "test_type", "TEXT NOT NULL DEFAULT ''");
+        await EnsureColumnAsync(connection, cancellationToken, "records", "pdf_local_path", "TEXT NOT NULL DEFAULT ''");
 
         await ExecuteNonQueryAsync(connection, cancellationToken, """
             CREATE INDEX IF NOT EXISTS idx_records_patient_id ON records(patient_id, received_at DESC);
@@ -93,12 +94,12 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
                 INSERT INTO records (
                     id, source_id, title, sender, recipient, received_at, summary,
                     plain_text_content, html_content, tags_json, raw_payload_json, imported_at,
-                    patient_id, test_type
+                    patient_id, test_type, pdf_local_path
                 )
                 VALUES (
                     $id, $source_id, $title, $sender, $recipient, $received_at, $summary,
                     $plain_text_content, $html_content, $tags_json, $raw_payload_json, $imported_at,
-                    $patient_id, $test_type
+                    $patient_id, $test_type, $pdf_local_path
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     source_id = excluded.source_id,
@@ -113,7 +114,8 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
                     raw_payload_json = excluded.raw_payload_json,
                     imported_at = excluded.imported_at,
                     patient_id = excluded.patient_id,
-                    test_type = excluded.test_type;
+                    test_type = excluded.test_type,
+                    pdf_local_path = excluded.pdf_local_path;
                 """;
 
             command.Parameters.AddWithValue("$id", normalizedRecord.Id);
@@ -130,6 +132,7 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
             command.Parameters.AddWithValue("$imported_at", DateTimeOffset.UtcNow.UtcDateTime.ToString("O"));
             command.Parameters.AddWithValue("$patient_id", normalizedRecord.PatientId);
             command.Parameters.AddWithValue("$test_type", normalizedRecord.TestType);
+            command.Parameters.AddWithValue("$pdf_local_path", normalizedRecord.PdfLocalPath);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -146,7 +149,7 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
             command.CommandText = """
                 SELECT id, source_id, title, sender, recipient, received_at, summary,
                        plain_text_content, html_content, tags_json, raw_payload_json,
-                       patient_id, test_type
+                       patient_id, test_type, pdf_local_path
                 FROM records
                 ORDER BY received_at DESC
                 LIMIT 500;
@@ -157,7 +160,7 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
             command.CommandText = """
                 SELECT id, source_id, title, sender, recipient, received_at, summary,
                        plain_text_content, html_content, tags_json, raw_payload_json,
-                       patient_id, test_type
+                       patient_id, test_type, pdf_local_path
                 FROM records
                 WHERE title LIKE $query
                    OR sender LIKE $query
@@ -191,7 +194,7 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
         command.CommandText = """
             SELECT id, source_id, title, sender, recipient, received_at, summary,
                    plain_text_content, html_content, tags_json, raw_payload_json,
-                   patient_id, test_type
+                   patient_id, test_type, pdf_local_path
             FROM records
             WHERE patient_id = $patient_id
                OR raw_payload_json LIKE $payload_pattern
@@ -347,7 +350,8 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
             Tags = record.Tags,
             RawPayloadJson = record.RawPayloadJson,
             PatientId = PatientRecordHelper.ResolvePatientId(record),
-            TestType = PatientRecordHelper.ResolveTestType(record)
+            TestType = PatientRecordHelper.ResolveTestType(record),
+            PdfLocalPath = record.PdfLocalPath
         };
     }
 
@@ -469,7 +473,10 @@ public sealed class SqliteRecordStore : IRecordStore, IClinicalNoteStore
             Tags = tags ?? Array.Empty<string>(),
             RawPayloadJson = reader.GetString(10),
             PatientId = reader.GetString(11),
-            TestType = reader.GetString(12)
+            TestType = reader.GetString(12),
+            PdfLocalPath = reader.FieldCount > 13 && !reader.IsDBNull(13)
+                ? reader.GetString(13)
+                : string.Empty
         };
     }
 }

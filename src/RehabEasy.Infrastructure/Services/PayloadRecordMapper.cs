@@ -17,7 +17,11 @@ internal static class PayloadRecordMapper
     private static readonly string[] HtmlKeys = ["html", "html_body", "htmlBody"];
     private static readonly string[] TagsKeys = ["tags", "labels", "etiquetas", "categorias"];
 
-    public static IReadOnlyList<RehabEasyRecord> Map(string payloadId, JsonElement payload, DateTimeOffset importedAt)
+    public static IReadOnlyList<RehabEasyRecord> Map(
+        string payloadId,
+        JsonElement payload,
+        DateTimeOffset importedAt,
+        string pdfLocalPath = "")
     {
         List<JsonElement> sourceRecords = ExtractRecordElements(payload);
         if (sourceRecords.Count == 0 && payload.ValueKind == JsonValueKind.Object)
@@ -27,7 +31,7 @@ internal static class PayloadRecordMapper
 
         return sourceRecords
             .Where(record => record.ValueKind == JsonValueKind.Object)
-            .Select((record, index) => MapRecord(payloadId, record, index, importedAt))
+            .Select((record, index) => MapRecord(payloadId, record, index, importedAt, pdfLocalPath))
             .OrderByDescending(record => record.ReceivedAt)
             .ToList();
     }
@@ -37,7 +41,12 @@ internal static class PayloadRecordMapper
         return GetString(payload, "source", "source_system", "sistema", "origem") ?? "api";
     }
 
-    private static RehabEasyRecord MapRecord(string payloadId, JsonElement record, int index, DateTimeOffset importedAt)
+    private static RehabEasyRecord MapRecord(
+        string payloadId,
+        JsonElement record,
+        int index,
+        DateTimeOffset importedAt,
+        string pdfLocalPath)
     {
         string sourceId = GetString(record, IdKeys) ?? $"{payloadId}:{index + 1}";
         string title = GetString(record, TitleKeys) ?? $"Registro {index + 1}";
@@ -59,7 +68,8 @@ internal static class PayloadRecordMapper
             Tags = GetTags(record),
             RawPayloadJson = rawJson,
             PatientId = PatientRecordHelper.TryGetPatientExternalId(rawJson) ?? string.Empty,
-            TestType = PatientRecordHelper.ResolveTestType(rawJson)
+            TestType = PatientRecordHelper.ResolveTestType(rawJson),
+            PdfLocalPath = pdfLocalPath
         };
     }
 

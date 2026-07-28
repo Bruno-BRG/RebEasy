@@ -86,6 +86,7 @@ public partial class MainWindow : Window
             : record.PlainTextContent;
         DeleteButton.IsEnabled = true;
         UpdateCharts(record);
+        _ = ShowPdfAsync(record.PdfLocalPath);
         SyncPatientIdFromRecord(record);
     }
 
@@ -118,6 +119,7 @@ public partial class MainWindow : Window
             SubjectText.Text = "Nenhum registro selecionado";
             MetaText.Text = "Selecione um registro na aba Registros.";
             BodyText.Text = "Os dados do exame aparecem aqui.";
+            await ClearPdfAsync();
             StatusText.Text = "Registro apagado do RehabEasy local.";
         }
         catch (Exception exception)
@@ -610,6 +612,10 @@ public partial class MainWindow : Window
             await LoadPatientHistoryAsync();
 
             StatusText.Text = $"Payload {result.PayloadId} importado de {result.SourceName}: {result.Records.Count} registros gravados.";
+            if (!string.IsNullOrWhiteSpace(result.PdfLocalPath))
+            {
+                StatusText.Text += " PDF salvo localmente.";
+            }
         }
         catch (Exception exception)
         {
@@ -643,6 +649,7 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Nenhum registro local encontrado.";
             UpdateCharts(null);
+            await ClearPdfAsync();
         }
     }
 
@@ -669,6 +676,61 @@ public partial class MainWindow : Window
         {
             MessagesList.SelectedIndex = 0;
         }
+    }
+
+    private async Task ShowPdfAsync(string? pdfLocalPath)
+    {
+        if (PdfWebView is null || PdfPlaceholderText is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(pdfLocalPath) || !File.Exists(pdfLocalPath))
+        {
+            await ClearPdfAsync();
+            return;
+        }
+
+        try
+        {
+            await PdfWebView.EnsureCoreWebView2Async();
+            string fileUri = new Uri(pdfLocalPath).AbsoluteUri;
+            PdfWebView.Source = new Uri(fileUri);
+            PdfWebView.Visibility = Visibility.Visible;
+            PdfPlaceholderText.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception exception)
+        {
+            PdfWebView.Visibility = Visibility.Collapsed;
+            PdfPlaceholderText.Visibility = Visibility.Visible;
+            PdfPlaceholderText.Text = $"Nao foi possivel abrir o PDF: {exception.Message}";
+        }
+    }
+
+    private async Task ClearPdfAsync()
+    {
+        if (PdfWebView is null || PdfPlaceholderText is null)
+        {
+            return;
+        }
+
+        PdfWebView.Visibility = Visibility.Collapsed;
+        PdfPlaceholderText.Visibility = Visibility.Visible;
+        PdfPlaceholderText.Text = "Selecione um registro com PDF para visualizar.";
+
+        try
+        {
+            if (PdfWebView.CoreWebView2 is not null)
+            {
+                PdfWebView.CoreWebView2.Navigate("about:blank");
+            }
+        }
+        catch
+        {
+            // Ignore cleanup failures for the embedded browser.
+        }
+
+        await Task.CompletedTask;
     }
 
     private void UpdateCharts(RehabEasyRecord? record)

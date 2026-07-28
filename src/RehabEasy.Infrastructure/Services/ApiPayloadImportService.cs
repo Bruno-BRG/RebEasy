@@ -17,11 +17,17 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
 
     private readonly HttpClient _httpClient;
     private readonly string _systemBApiKey;
+    private readonly string _pdfStorageDirectory;
 
-    public ApiPayloadImportService(HttpClient httpClient, string systemBApiKey)
+    public ApiPayloadImportService(HttpClient httpClient, string systemBApiKey, string? pdfStorageDirectory = null)
     {
         _httpClient = httpClient;
         _systemBApiKey = systemBApiKey;
+        _pdfStorageDirectory = pdfStorageDirectory
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "RehabEasy",
+                "pdfs");
     }
 
     public async Task<ApiPayloadImportResult> ImportPayloadAsync(string payloadId, CancellationToken cancellationToken)
@@ -41,22 +47,7 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
             throw new InvalidOperationException($"API retornou {(int)response.StatusCode}: {error}");
         }
 
-        ApiPayloadEnvelope? envelope = await response.Content.ReadFromJsonAsync<ApiPayloadEnvelope>(JsonOptions, cancellationToken);
-        if (envelope?.Payload is null)
-        {
-            throw new InvalidOperationException("A API retornou um payload vazio ou invalido.");
-        }
-
-        DateTimeOffset importedAt = DateTimeOffset.UtcNow;
-        IReadOnlyList<RehabEasyRecord> records = PayloadRecordMapper.Map(envelope.Id, envelope.Payload, importedAt);
-
-        return new ApiPayloadImportResult
-        {
-            PayloadId = envelope.Id,
-            SourceName = PayloadRecordMapper.GetSourceName(envelope.Payload),
-            ImportedAt = importedAt,
-            Records = records
-        };
+        return await BuildImportResultAsync(response, cancellationToken);
     }
 
     public async Task<ApiPayloadImportResult?> ImportNextPayloadAsync(CancellationToken cancellationToken)
@@ -76,6 +67,13 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
             throw new InvalidOperationException($"API retornou {(int)response.StatusCode}: {error}");
         }
 
+        return await BuildImportResultAsync(response, cancellationToken);
+    }
+
+    private async Task<ApiPayloadImportResult> BuildImportResultAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
         ApiPayloadEnvelope? envelope = await response.Content.ReadFromJsonAsync<ApiPayloadEnvelope>(JsonOptions, cancellationToken);
         if (envelope?.Payload is null)
         {
@@ -83,15 +81,46 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
         }
 
         DateTimeOffset importedAt = DateTimeOffset.UtcNow;
-        IReadOnlyList<RehabEasyRecord> records = PayloadRecordMapper.Map(envelope.Id, envelope.Payload, importedAt);
+        string pdfLocalPath = string.Empty;
+        if (!string.IsNullOrWhiteSpace(envelope.PdfUrl))
+        {
+            pdfLocalPath = await DownloadPdfAsync(envelope.Id, envelope.PdfUrl, cancellationToken);
+        }
+
+        IReadOnlyList<RehabEasyRecord> records = PayloadRecordMapper.Map(
+            envelope.Id,
+            envelope.Payload.Value,
+            importedAt,
+            pdfLocalPath);
 
         return new ApiPayloadImportResult
         {
             PayloadId = envelope.Id,
-            SourceName = PayloadRecordMapper.GetSourceName(envelope.Payload),
+            SourceName = PayloadRecordMapper.GetSourceName(envelope.Payload.Value),
             ImportedAt = importedAt,
+            PdfUrl = envelope.PdfUrl,
+            PdfLocalPath = pdfLocalPath,
             Records = records
         };
+    }
+
+    private async Task<string> DownloadPdfAsync(string payloadId, string pdfUrl, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(_pdfStorageDirectory);
+        string safeName = string.Join("_", payloadId.Split(Path.GetInvalidFileNameChars()));
+        string targetPath = Path.Combine(_pdfStorageDirectory, $"{safeName}.pdf");
+
+        using HttpResponseMessage pdfResponse = await _httpClient.GetAsync(pdfUrl, cancellationToken);
+        if (!pdfResponse.IsSuccessStatusCode)
+        {
+            string error = await pdfResponse.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Falha ao baixar PDF: {(int)pdfResponse.StatusCode} {error}");
+        }
+
+        await using Stream source = await pdfResponse.Content.ReadAsStreamAsync(cancellationToken);
+        await using FileStream target = new(targetPath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await source.CopyToAsync(target, cancellationToken);
+        return targetPath;
     }
 
     private sealed class ApiPayloadEnvelope
@@ -100,6 +129,9 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
         public string Id { get; init; } = string.Empty;
 
         [JsonPropertyName("payload")]
-        public JsonElement Payload { get; init; }
+        public JsonElement? Payload { get; init; }
+
+        [JsonPropertyName("pdf_url")]
+        public string? PdfUrl { get; init; }
     }
 }
