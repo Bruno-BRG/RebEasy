@@ -57,7 +57,9 @@ internal static class PayloadRecordMapper
             PlainTextContent = plainTextContent,
             HtmlContent = GetString(record, HtmlKeys) ?? string.Empty,
             Tags = GetTags(record),
-            RawPayloadJson = rawJson
+            RawPayloadJson = rawJson,
+            PatientId = PatientRecordHelper.TryGetPatientExternalId(rawJson) ?? string.Empty,
+            TestType = PatientRecordHelper.ResolveTestType(rawJson)
         };
     }
 

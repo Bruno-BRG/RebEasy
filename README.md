@@ -28,6 +28,21 @@ As duas variaveis sao opcionais para o fluxo padrao. Quando nao forem informadas
 
 ## Rodar localmente
 
+Atalho recomendado (Windows):
+
+```powershell
+.\run.cmd
+```
+
+Ou com opcoes:
+
+```powershell
+.\scripts\run.ps1 -Build -Restore
+.\scripts\run.ps1 -Release -ApiBaseUrl "https://telemedicinacc.vercel.app" -SystemBApiKey "rehabeasy-system-b"
+```
+
+Manualmente:
+
 ```powershell
 dotnet restore
 dotnet build

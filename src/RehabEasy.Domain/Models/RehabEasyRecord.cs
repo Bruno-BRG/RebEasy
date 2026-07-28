@@ -13,4 +13,6 @@ public sealed class RehabEasyRecord
     public string HtmlContent { get; init; } = string.Empty;
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
     public string RawPayloadJson { get; init; } = "{}";
+    public string PatientId { get; init; } = string.Empty;
+    public string TestType { get; init; } = string.Empty;
 }

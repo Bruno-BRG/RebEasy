@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,7 +20,14 @@ public partial class MainWindow : Window
 
     private readonly IApiPayloadImportService? _payloadImportService;
     private readonly IRecordStore _recordStore;
+    private readonly IClinicalNoteStore _clinicalNoteStore;
+    private readonly IPatientHistoryService _patientHistoryService;
     private List<RehabEasyRecord> _currentRecords = [];
+    private PatientHistorySnapshot? _currentPatientHistory;
+    private string _lastHistoryReport = string.Empty;
+    private bool _isLoadingClinicalNote;
+    private const string ClinicalNotePlaceholder =
+        "Escreva aqui a evolucao clinica, conduta e observacoes do paciente.";
 
     public MainWindow()
     {
@@ -28,10 +36,12 @@ public partial class MainWindow : Window
         SqliteRecordStore sqliteRecordStore = new(GetDatabasePath());
         sqliteRecordStore.InitializeAsync(CancellationToken.None).GetAwaiter().GetResult();
         _recordStore = sqliteRecordStore;
+        _clinicalNoteStore = sqliteRecordStore;
+        _patientHistoryService = new PatientHistoryService(_recordStore, _clinicalNoteStore);
 
-        PatientIdTextBox.Text = "PAC2026001";
         DataObject.AddPastingHandler(PatientIdTextBox, PatientIdTextBox_OnPaste);
         LoadLocalRecordsAsync().GetAwaiter().GetResult();
+        LoadPatientHistoryAsync().GetAwaiter().GetResult();
 
         if (!TryCreateApiPayloadImportService(out IApiPayloadImportService? importService, out string configurationMessage))
         {
@@ -40,6 +50,21 @@ public partial class MainWindow : Window
         }
 
         _payloadImportService = importService;
+    }
+
+    private void PatientActionsMenuButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (PatientActionsMenuButton.ContextMenu is ContextMenu menu)
+        {
+            menu.PlacementTarget = PatientActionsMenuButton;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void PatientActionsContextMenu_OnOpened(object sender, RoutedEventArgs e)
+    {
+        DeleteMenuItem.IsEnabled = MessagesList.SelectedItem is RehabEasyRecord;
+        DeleteButton.IsEnabled = DeleteMenuItem.IsEnabled;
     }
 
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e)
@@ -61,6 +86,7 @@ public partial class MainWindow : Window
             : record.PlainTextContent;
         DeleteButton.IsEnabled = true;
         UpdateCharts(record);
+        SyncPatientIdFromRecord(record);
     }
 
     private async void DeleteButton_OnClick(object sender, RoutedEventArgs e)
@@ -89,9 +115,9 @@ public partial class MainWindow : Window
         {
             await _recordStore.DeleteRecordAsync(record.Id, CancellationToken.None);
             await LoadLocalRecordsAsync();
-            SubjectText.Text = "Descricao dos testes realizados";
-            MetaText.Text = "Selecione um registro para ver os testes informados.";
-            BodyText.Text = "Os testes recebidos da API aparecerao aqui.";
+            SubjectText.Text = "Nenhum registro selecionado";
+            MetaText.Text = "Selecione um registro na aba Registros.";
+            BodyText.Text = "Os dados do exame aparecem aqui.";
             StatusText.Text = "Registro apagado do RehabEasy local.";
         }
         catch (Exception exception)
@@ -137,6 +163,414 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ClinicalNoteTextBox_OnGotFocus(object sender, RoutedEventArgs e)
+    {
+        if (string.Equals(ClinicalNoteTextBox.Text, ClinicalNotePlaceholder, StringComparison.Ordinal))
+        {
+            ClinicalNoteTextBox.Text = string.Empty;
+        }
+    }
+
+    private async void PatientIdTextBox_OnLostFocus(object sender, RoutedEventArgs e)
+    {
+        await LoadClinicalNoteForCurrentPatientAsync();
+        await LoadLocalRecordsAsync();
+        await LoadPatientHistoryAsync();
+    }
+
+    private async void SaveClinicalNoteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        string patientId = PatientIdTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            MessageBox.Show(
+                this,
+                "Informe o ID do paciente antes de salvar o prontuario.",
+                "Prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string content = GetClinicalNoteContent();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            MessageBox.Show(
+                this,
+                "Escreva o conteudo do prontuario antes de salvar.",
+                "Prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            await _clinicalNoteStore.SaveClinicalNoteAsync(patientId, content, CancellationToken.None);
+            ClinicalNoteStatusText.Text = $"Prontuario salvo para o paciente {patientId} em {DateTime.Now:g}.";
+            StatusText.Text = ClinicalNoteStatusText.Text;
+            await LoadPatientHistoryAsync();
+        }
+        catch (Exception exception)
+        {
+            ClinicalNoteStatusText.Text = "Falha ao salvar prontuario.";
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "Erro ao salvar prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void CopyClinicalNoteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        string patientId = PatientIdTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            MessageBox.Show(
+                this,
+                "Informe o ID do paciente antes de copiar o prontuario.",
+                "Prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        RehabEasyRecord? selectedRecord = MessagesList.SelectedItem as RehabEasyRecord;
+        string report = BuildClinicalReportText(patientId, selectedRecord, GetClinicalNoteContent());
+
+        try
+        {
+            Clipboard.SetText(report);
+            ClinicalNoteStatusText.Text = "Prontuario copiado para a area de transferencia.";
+            StatusText.Text = ClinicalNoteStatusText.Text;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "Erro ao copiar prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void InsertExamDataButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (MessagesList.SelectedItem is not RehabEasyRecord record)
+        {
+            MessageBox.Show(
+                this,
+                "Selecione um registro de exame para inserir os dados no prontuario.",
+                "Prontuario",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        string examSection = BuildExamDataSection(record);
+        string currentContent = GetClinicalNoteContent();
+
+        ClinicalNoteTextBox.Text = string.IsNullOrWhiteSpace(currentContent)
+            ? examSection
+            : $"{currentContent.TrimEnd()}{Environment.NewLine}{Environment.NewLine}{examSection}";
+
+        ClinicalNoteTextBox.CaretIndex = ClinicalNoteTextBox.Text.Length;
+        ClinicalNoteTextBox.Focus();
+    }
+
+    private async Task LoadClinicalNoteForCurrentPatientAsync()
+    {
+        if (_isLoadingClinicalNote || ClinicalNoteTextBox is null)
+        {
+            return;
+        }
+
+        string patientId = PatientIdTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            ClinicalNoteTextBox.Text = ClinicalNotePlaceholder;
+            ClinicalNoteStatusText.Text = "Informe o ID do paciente acima para salvar o prontuario.";
+            return;
+        }
+
+        _isLoadingClinicalNote = true;
+        try
+        {
+            PatientClinicalNote? note = await _clinicalNoteStore.GetClinicalNoteAsync(patientId, CancellationToken.None);
+            if (note is null || string.IsNullOrWhiteSpace(note.Content))
+            {
+                ClinicalNoteTextBox.Text = ClinicalNotePlaceholder;
+                ClinicalNoteStatusText.Text = $"Nenhum prontuario salvo para o paciente {patientId}.";
+                return;
+            }
+
+            ClinicalNoteTextBox.Text = note.Content;
+            ClinicalNoteStatusText.Text =
+                $"Prontuario carregado para {patientId}. Ultima atualizacao: {note.UpdatedAt.LocalDateTime:g}.";
+        }
+        finally
+        {
+            _isLoadingClinicalNote = false;
+        }
+    }
+
+    private void SyncPatientIdFromRecord(RehabEasyRecord record)
+    {
+        string? patientExternalId = PatientRecordHelper.TryGetPatientExternalId(record.RawPayloadJson);
+        if (string.IsNullOrWhiteSpace(patientExternalId))
+        {
+            return;
+        }
+
+        if (string.Equals(PatientIdTextBox.Text.Trim(), patientExternalId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        PatientIdTextBox.Text = patientExternalId;
+        _ = LoadClinicalNoteForCurrentPatientAsync();
+        _ = LoadPatientHistoryAsync();
+    }
+
+    private string GetClinicalNoteContent()
+    {
+        string content = ClinicalNoteTextBox.Text.Trim();
+        return string.Equals(content, ClinicalNotePlaceholder, StringComparison.Ordinal)
+            ? string.Empty
+            : content;
+    }
+
+    private static string BuildExamDataSection(RehabEasyRecord record)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine("--- DADOS DO EXAME ---");
+        builder.AppendLine($"Exame: {record.Title}");
+        builder.AppendLine($"Origem: {record.Sender}");
+        builder.AppendLine($"Recebido em: {record.ReceivedAt.LocalDateTime:g}");
+
+        string? patientName = PatientRecordHelper.TryGetPatientName(record.RawPayloadJson);
+        if (!string.IsNullOrWhiteSpace(patientName))
+        {
+            builder.AppendLine($"Paciente: {patientName}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(record.Summary))
+        {
+            builder.AppendLine($"Resumo: {record.Summary}");
+        }
+
+        builder.AppendLine();
+        builder.AppendLine(string.IsNullOrWhiteSpace(record.PlainTextContent)
+            ? record.RawPayloadJson
+            : record.PlainTextContent);
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildClinicalReportText(string patientId, RehabEasyRecord? selectedRecord, string clinicalNote)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine("EVOLUCAO CLINICA - RehabEasy");
+        builder.AppendLine($"Paciente ID: {patientId}");
+        builder.AppendLine($"Gerado em: {DateTime.Now:g}");
+        builder.AppendLine();
+
+        if (selectedRecord is not null)
+        {
+            builder.AppendLine(BuildExamDataSection(selectedRecord));
+            builder.AppendLine();
+            builder.AppendLine("--- INDICADORES ---");
+            builder.AppendLine(BuildChartSummaryText());
+            builder.AppendLine();
+        }
+
+        builder.AppendLine("--- PRONTUARIO / EVOLUCAO ---");
+        builder.AppendLine(string.IsNullOrWhiteSpace(clinicalNote)
+            ? "(Sem texto de prontuario registrado.)"
+            : clinicalNote);
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private string BuildChartSummaryText()
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"{SummaryTitleText.Text}: {AverageTimeText.Text} ({PrimaryMetricLabelText.Text})");
+        builder.AppendLine($"Registros: {TestsCountText.Text}");
+        builder.AppendLine($"Alerta: {RiskText.Text}");
+        builder.AppendLine($"{DtcLabelText.Text}: {DtcText.Text}");
+        builder.AppendLine($"{SpeedLabelText.Text}: {SpeedText.Text}");
+        builder.AppendLine($"Status: {StatusIndicatorText.Text}");
+
+        if (!string.IsNullOrWhiteSpace(ChartNotesText.Text))
+        {
+            builder.AppendLine($"Observacao: {ChartNotesText.Text}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private string? GetPatientFilterQuery()
+    {
+        string patientId = PatientIdTextBox.Text.Trim();
+        return string.IsNullOrWhiteSpace(patientId) ? null : patientId;
+    }
+
+    private async Task LoadPatientHistoryAsync()
+    {
+        string patientId = PatientIdTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            _currentPatientHistory = null;
+            _lastHistoryReport = string.Empty;
+            PatientHistorySummaryText.Text = "Informe o ID do paciente para ver o historico.";
+            PatientTimelineList.ItemsSource = Array.Empty<PatientTimelineItem>();
+            return;
+        }
+
+        try
+        {
+            PatientHistorySnapshot history =
+                await _patientHistoryService.GetPatientHistoryAsync(patientId, CancellationToken.None);
+            _currentPatientHistory = history;
+            _lastHistoryReport = _patientHistoryService.BuildHistoryReport(history);
+
+            Dictionary<string, int> testCounts = history.Tests
+                .GroupBy(test => test.TestType)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            string testSummary = testCounts.Count == 0
+                ? "0 testes"
+                : string.Join(", ", testCounts.Select(pair => $"{pair.Value} {pair.Key}"));
+
+            PatientHistorySummaryText.Text =
+                $"Historico: {testSummary} | {history.ClinicalNotes.Count} versoes de prontuario";
+
+            List<PatientTimelineItem> timelineItems = [];
+            foreach (PatientTestHistoryEntry test in history.Tests)
+            {
+                timelineItems.Add(new PatientTimelineItem
+                {
+                    Category = "Teste",
+                    Headline = $"{test.TestType} - {test.Title}",
+                    Subline = $"{test.ReceivedAt.LocalDateTime:g} | {test.MetricsSummary}",
+                    OccurredAt = test.ReceivedAt,
+                    RecordId = test.RecordId
+                });
+            }
+
+            foreach (PatientClinicalNoteHistoryEntry note in history.ClinicalNotes)
+            {
+                string preview = note.Content.Length > 90
+                    ? note.Content[..90] + "..."
+                    : note.Content;
+
+                timelineItems.Add(new PatientTimelineItem
+                {
+                    Category = "Prontuario",
+                    Headline = "Prontuario salvo",
+                    Subline = $"{note.SavedAt.LocalDateTime:g} | {preview}",
+                    OccurredAt = note.SavedAt
+                });
+            }
+
+            PatientTimelineList.ItemsSource = timelineItems
+                .OrderByDescending(item => item.OccurredAt)
+                .ToList();
+        }
+        catch (Exception exception)
+        {
+            PatientHistorySummaryText.Text = "Falha ao carregar historico do paciente.";
+            PatientTimelineList.ItemsSource = Array.Empty<PatientTimelineItem>();
+            StatusText.Text = exception.Message;
+        }
+    }
+
+    private async void GenerateHistoryReportButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (!await TryEnsureHistoryReportAsync())
+        {
+            return;
+        }
+
+        ClinicalNoteStatusText.Text = "Relatorio de historico gerado.";
+        StatusText.Text =
+            $"Relatorio pronto para o paciente {PatientIdTextBox.Text.Trim()} ({_currentPatientHistory?.Tests.Count ?? 0} testes). Use Copiar historico.";
+    }
+
+    private async void CopyHistoryReportButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (!await TryEnsureHistoryReportAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(_lastHistoryReport);
+            ClinicalNoteStatusText.Text = "Historico completo copiado para a area de transferencia.";
+            StatusText.Text = ClinicalNoteStatusText.Text;
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                exception.Message,
+                "Erro ao copiar historico",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private void PatientTimelineList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PatientTimelineList.SelectedItem is not PatientTimelineItem timelineItem ||
+            string.IsNullOrWhiteSpace(timelineItem.RecordId))
+        {
+            return;
+        }
+
+        RehabEasyRecord? record = _currentRecords.FirstOrDefault(item => item.Id == timelineItem.RecordId);
+        if (record is not null)
+        {
+            MessagesList.SelectedItem = record;
+        }
+    }
+
+    private async Task<bool> TryEnsureHistoryReportAsync()
+    {
+        string patientId = PatientIdTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(patientId))
+        {
+            MessageBox.Show(
+                this,
+                "Informe o ID do paciente para gerar o relatorio de historico.",
+                "Historico do paciente",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        await LoadPatientHistoryAsync();
+
+        if (_currentPatientHistory is null ||
+            (_currentPatientHistory.Tests.Count == 0 && _currentPatientHistory.ClinicalNotes.Count == 0))
+        {
+            MessageBox.Show(
+                this,
+                "Nenhum historico encontrado para este paciente.",
+                "Historico do paciente",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        return true;
+    }
+
     private static bool IsAlphanumeric(string value)
     {
         return value.All(char.IsLetterOrDigit);
@@ -173,6 +607,7 @@ public partial class MainWindow : Window
 
             await LoadLocalRecordsAsync();
             MessagesList.SelectedIndex = result.Records.Count > 0 ? 0 : -1;
+            await LoadPatientHistoryAsync();
 
             StatusText.Text = $"Payload {result.PayloadId} importado de {result.SourceName}: {result.Records.Count} registros gravados.";
         }
@@ -200,7 +635,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        IReadOnlyList<RehabEasyRecord> records = await _recordStore.SearchAsync(null, CancellationToken.None);
+        IReadOnlyList<RehabEasyRecord> records = await _recordStore.SearchAsync(GetPatientFilterQuery(), CancellationToken.None);
         _currentRecords = records.ToList();
         ApplyRecordSort();
 
@@ -238,7 +673,7 @@ public partial class MainWindow : Window
 
     private void UpdateCharts(RehabEasyRecord? record)
     {
-        TestsCountText.Text = _currentRecords.Count.ToString();
+        TestsCountText.Text = (_currentPatientHistory?.Tests.Count ?? _currentRecords.Count).ToString();
 
         if (record is null)
         {
