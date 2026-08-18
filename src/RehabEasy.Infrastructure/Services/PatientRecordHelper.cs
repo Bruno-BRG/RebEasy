@@ -7,6 +7,7 @@ public static class PatientRecordHelper
 {
     public const string TestTypeCvTug = "CvTUG";
     public const string TestTypeEquilibrio = "Equilibrio";
+    public const string TestTypeIndexIndex = "Index-Index";
     public const string TestTypeOther = "Outro";
 
     public static string? TryGetPatientExternalId(string rawPayloadJson)
@@ -54,8 +55,27 @@ public static class PatientRecordHelper
                 return TestTypeEquilibrio;
             }
 
+            if (string.Equals(sender, TestTypeIndexIndex, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(sender, "index-index", StringComparison.OrdinalIgnoreCase))
+            {
+                return TestTypeIndexIndex;
+            }
+
             if (TryGetProperty(root, "assessment", out JsonElement assessment))
             {
+                string? assessmentTestType = TryGetString(assessment, "test_type");
+                if (!string.IsNullOrWhiteSpace(assessmentTestType) &&
+                    assessmentTestType.Contains("index", StringComparison.OrdinalIgnoreCase))
+                {
+                    return TestTypeIndexIndex;
+                }
+
+                if (TryGetProperty(assessment, "metrics", out JsonElement metrics) &&
+                    TryGetProperty(metrics, "final_fingertip_distance_mm", out _))
+                {
+                    return TestTypeIndexIndex;
+                }
+
                 if (TryGetProperty(assessment, "posturographic_indices", out _))
                 {
                     return TestTypeEquilibrio;
@@ -107,6 +127,11 @@ public static class PatientRecordHelper
             testType.Contains("posturo", StringComparison.OrdinalIgnoreCase))
         {
             return TestTypeEquilibrio;
+        }
+
+        if (testType.Contains("index", StringComparison.OrdinalIgnoreCase))
+        {
+            return TestTypeIndexIndex;
         }
 
         return testType.Trim();

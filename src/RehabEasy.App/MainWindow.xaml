@@ -52,9 +52,9 @@
         <!-- Layout principal: contexto | prontuario | graficos -->
         <Grid Grid.Row="1" Margin="16">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" MinWidth="260" />
+                <ColumnDefinition Width="280" MinWidth="240" />
                 <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="*" MinWidth="340" />
+                <ColumnDefinition Width="1.4*" MinWidth="420" />
                 <ColumnDefinition Width="14" />
                 <ColumnDefinition Width="*" MinWidth="340" />
             </Grid.ColumnDefinitions>
@@ -252,21 +252,15 @@
                 </Grid>
             </Border>
 
-            <!-- Coluna 2: PDF do exame + prontuario -->
+            <!-- Coluna 2: PDF do exame (destaque principal) -->
             <Border Grid.Column="2"
                     Style="{StaticResource MedCard}"
                     Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="14" />
-                        <RowDefinition Height="2*" MinHeight="220" />
-                        <RowDefinition Height="14" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="10" />
-                        <RowDefinition Height="*" MinHeight="140" />
-                        <RowDefinition Height="10" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <StackPanel>
@@ -274,7 +268,7 @@
                                    Text="PDF do exame" />
                         <TextBlock Margin="0,4,0,0"
                                    Style="{StaticResource MedCaption}"
-                                   Text="Documento original importado da API, com indicadores ao lado." />
+                                   Text="Documento original em destaque. Indicadores e prontuario ficam a direita." />
                     </StackPanel>
 
                     <Border Grid.Row="2"
@@ -292,76 +286,26 @@
                                          Visibility="Collapsed" />
                         </Grid>
                     </Border>
-
-                    <Grid Grid.Row="4">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="12" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource MedSectionTitle}"
-                                       Text="Prontuario" />
-                            <TextBlock Margin="0,4,0,0"
-                                       Style="{StaticResource MedCaption}"
-                                       Text="Evolucao clinica, conduta e observacoes do paciente." />
-                        </StackPanel>
-                        <WrapPanel Grid.Row="2"
-                                   HorizontalAlignment="Stretch">
-                            <Button x:Name="InsertExamDataButton"
-                                    Visibility="Collapsed"
-                                    Style="{StaticResource MedButtonSecondary}"
-                                    MinWidth="160"
-                                    Click="InsertExamDataButton_OnClick"
-                                    Content="Inserir dados do exame" />
-                            <Button x:Name="SaveClinicalNoteButton"
-                                    Style="{StaticResource MedButtonPrimary}"
-                                    MinWidth="100"
-                                    Click="SaveClinicalNoteButton_OnClick"
-                                    Content="Salvar" />
-                            <Button x:Name="CopyClinicalNoteButton"
-                                    Style="{StaticResource MedButtonAccent}"
-                                    MinWidth="160"
-                                    Margin="0"
-                                    Click="CopyClinicalNoteButton_OnClick"
-                                    Content="Copiar prontuario" />
-                        </WrapPanel>
-                    </Grid>
-
-                    <TextBox x:Name="ClinicalNoteTextBox"
-                             Grid.Row="6"
-                             Padding="16,14"
-                             AcceptsReturn="True"
-                             AcceptsTab="True"
-                             FontSize="15"
-                             GotFocus="ClinicalNoteTextBox_OnGotFocus"
-                             TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Disabled"
-                             Background="{StaticResource MedSurfaceBrush}"
-                             BorderBrush="{StaticResource MedBorderBrush}"
-                             BorderThickness="1"
-                             Foreground="{StaticResource MedTextPrimaryBrush}"
-                             Text="Escreva aqui a evolucao clinica, conduta e observacoes do paciente." />
-
-                    <TextBlock x:Name="ClinicalNoteStatusText"
-                               Grid.Row="8"
-                               Style="{StaticResource MedCaption}"
-                               Text="Informe o ID do paciente para salvar o prontuario." />
                 </Grid>
             </Border>
 
-            <!-- Coluna 3: graficos (destaque principal) -->
+            <!-- Coluna 3: indicadores + prontuario -->
             <Border Grid.Column="4"
                     Style="{StaticResource MedCard}"
                     Padding="20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="14" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="14" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="*" MinHeight="160" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <StackPanel>
@@ -369,16 +313,15 @@
                                    Text="Indicadores clinicos" />
                         <TextBlock Margin="0,4,0,0"
                                    Style="{StaticResource MedCaption}"
-                                   Text="Resumo visual atualizado com o registro selecionado." />
+                                   Text="Resumo visual do exame selecionado." />
                     </StackPanel>
 
                     <Border Grid.Row="2"
                             Style="{StaticResource MedCardMuted}"
-                            Padding="18">
+                            Padding="14">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
@@ -388,17 +331,16 @@
                                        Text="Resumo TUG" />
 
                             <Grid Grid.Row="1"
-                                  VerticalAlignment="Center"
-                                  Margin="0,12,0,12">
+                                  Margin="0,10,0,10">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="16" />
+                                    <RowDefinition Height="10" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <UniformGrid Rows="1">
-                                    <Border Margin="0,0,6,0"
-                                            Padding="10,16"
+                                    <Border Margin="0,0,4,0"
+                                            Padding="8,12"
                                             Background="{StaticResource MedSurfaceBrush}"
                                             BorderBrush="{StaticResource MedBorderBrush}"
                                             BorderThickness="1"
@@ -406,15 +348,15 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock x:Name="AverageTimeText"
                                                        Style="{StaticResource MedMetricValue}"
-                                                       FontSize="38"
+                                                       FontSize="28"
                                                        Text="--" />
                                             <TextBlock x:Name="PrimaryMetricLabelText"
                                                        Style="{StaticResource MedMetricLabel}"
                                                        Text="Tempo normal" />
                                         </StackPanel>
                                     </Border>
-                                    <Border Margin="3,0"
-                                            Padding="10,16"
+                                    <Border Margin="2,0"
+                                            Padding="8,12"
                                             Background="{StaticResource MedSurfaceBrush}"
                                             BorderBrush="{StaticResource MedBorderBrush}"
                                             BorderThickness="1"
@@ -422,14 +364,14 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock x:Name="TestsCountText"
                                                        Style="{StaticResource MedMetricValue}"
-                                                       FontSize="38"
+                                                       FontSize="28"
                                                        Text="0" />
                                             <TextBlock Style="{StaticResource MedMetricLabel}"
                                                        Text="Registros" />
                                         </StackPanel>
                                     </Border>
-                                    <Border Margin="6,0,0,0"
-                                            Padding="10,16"
+                                    <Border Margin="4,0,0,0"
+                                            Padding="8,12"
                                             Background="{StaticResource MedSurfaceBrush}"
                                             BorderBrush="{StaticResource MedBorderBrush}"
                                             BorderThickness="1"
@@ -437,7 +379,7 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock x:Name="RiskText"
                                                        HorizontalAlignment="Center"
-                                                       FontSize="30"
+                                                       FontSize="22"
                                                        FontWeight="Bold"
                                                        Foreground="{StaticResource MedWarningBrush}"
                                                        Text="--" />
@@ -450,7 +392,7 @@
                                 <ProgressBar x:Name="TugProgressBar"
                                              Grid.Row="2"
                                              Style="{StaticResource MedProgressBar}"
-                                             Height="14"
+                                             Height="12"
                                              Maximum="20"
                                              Value="0" />
                             </Grid>
@@ -459,15 +401,11 @@
                                        Grid.Row="2"
                                        Style="{StaticResource MedCaption}"
                                        Text="Referencia visual: 0 a 20 segundos" />
-                            <TextBlock Grid.Row="3"
-                                       Margin="0,6,0,0"
-                                       Style="{StaticResource MedCaption}"
-                                       Text="Indicadores atualizados ao selecionar um registro." />
                         </Grid>
                     </Border>
 
                     <Border Grid.Row="4"
-                            Padding="18"
+                            Padding="14"
                             Background="#EEF6F3"
                             BorderBrush="#C8DDD4"
                             BorderThickness="1"
@@ -475,108 +413,152 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="14" />
+                                <RowDefinition Height="8" />
+                                <RowDefinition Height="160" />
+                                <RowDefinition Height="8" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="12" />
+                                <RowDefinition Height="8" />
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="12" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Style="{StaticResource MedSectionTitle}"
-                                       Text="Indicadores auxiliares" />
+                            <DockPanel LastChildFill="False">
+                                <TextBlock x:Name="ChartPanelTitleText"
+                                           DockPanel.Dock="Left"
+                                           Style="{StaticResource MedSectionTitle}"
+                                           Text="Graficos do exame" />
+                                <Border DockPanel.Dock="Right"
+                                        Padding="8,3"
+                                        CornerRadius="10"
+                                        Background="{StaticResource MedSurfaceBrush}"
+                                        BorderBrush="{StaticResource MedBorderBrush}"
+                                        BorderThickness="1">
+                                    <TextBlock x:Name="StatusIndicatorText"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource MedTextPrimaryBrush}"
+                                               Text="--" />
+                                </Border>
+                            </DockPanel>
 
-                            <Grid Grid.Row="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="52" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="DtcLabelText"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource MedLabel}"
-                                           Text="DTC pior" />
-                                <ProgressBar x:Name="DtcProgressBar"
-                                             Grid.Column="1"
-                                             Style="{StaticResource MedProgressBar}"
-                                             Height="14"
-                                             Maximum="100"
-                                             Value="0" />
-                                <TextBlock x:Name="DtcText"
-                                           Grid.Column="2"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource MedBody}"
-                                           FontWeight="SemiBold"
-                                           Text="--" />
-                            </Grid>
-
-                            <Grid Grid.Row="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="52" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="SpeedLabelText"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource MedLabel}"
-                                           Text="Velocidade" />
-                                <ProgressBar x:Name="SpeedProgressBar"
-                                             Grid.Column="1"
-                                             Style="{StaticResource MedProgressBar}"
-                                             Height="14"
-                                             Maximum="2"
-                                             Value="0" />
-                                <TextBlock x:Name="SpeedText"
-                                           Grid.Column="2"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource MedBody}"
-                                           FontWeight="SemiBold"
-                                           Text="--" />
-                            </Grid>
-
-                            <Grid Grid.Row="6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="52" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Style="{StaticResource MedLabel}"
-                                           Text="Status" />
-                                <ProgressBar x:Name="StatusProgressBar"
-                                             Grid.Column="1"
-                                             Style="{StaticResource MedProgressBar}"
-                                             Height="14"
-                                             Maximum="100"
-                                             Value="0" />
-                                <TextBlock x:Name="StatusIndicatorText"
-                                           Grid.Column="2"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           Style="{StaticResource MedBody}"
-                                           FontWeight="SemiBold"
-                                           Text="--" />
-                            </Grid>
-
-                            <Border Grid.Row="7"
-                                    Margin="0,14,0,0"
-                                    Padding="14"
-                                    VerticalAlignment="Top"
+                            <Border Grid.Row="2"
                                     Background="{StaticResource MedSurfaceBrush}"
                                     BorderBrush="{StaticResource MedBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="8">
-                                <TextBlock x:Name="ChartNotesText"
-                                           Style="{StaticResource MedCaption}"
-                                           FontSize="13"
-                                           LineHeight="20"
-                                           Text="Aguardando registros importados da API." />
+                                    CornerRadius="8"
+                                    Padding="8,10,8,4">
+                                <ItemsControl x:Name="MainChartBars">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="3,0"
+                                                  ToolTip="{Binding Tooltip}">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="*" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <TextBlock HorizontalAlignment="Center"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MedTextPrimaryBrush}"
+                                                           Text="{Binding ValueLabel}" />
+                                                <Border Grid.Row="1"
+                                                        Margin="8,6,8,0"
+                                                        VerticalAlignment="Bottom"
+                                                        Height="{Binding BarHeight}"
+                                                        MinHeight="4"
+                                                        CornerRadius="7,7,2,2"
+                                                        Background="{Binding Fill}" />
+                                                <TextBlock Grid.Row="2"
+                                                           Margin="0,6,0,0"
+                                                           HorizontalAlignment="Center"
+                                                           FontSize="11"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{StaticResource MedTextSecondaryBrush}"
+                                                           Text="{Binding Label}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </Border>
+
+                            <TextBlock x:Name="ChartLegendText"
+                                       Grid.Row="4"
+                                       Style="{StaticResource MedCaption}"
+                                       FontSize="11"
+                                       Text="Selecione um exame para ver os graficos." />
+
+                            <TextBlock x:Name="ChartNotesText"
+                                       Grid.Row="6"
+                                       Style="{StaticResource MedCaption}"
+                                       FontSize="12"
+                                       LineHeight="18"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="64"
+                                       Text="Aguardando registros importados da API." />
                         </Grid>
                     </Border>
+
+                    <Grid Grid.Row="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource MedSectionTitle}"
+                                       Text="Prontuario" />
+                            <TextBlock Margin="0,2,0,0"
+                                       Style="{StaticResource MedCaption}"
+                                       Text="Evolucao clinica do paciente selecionado." />
+                        </StackPanel>
+                        <WrapPanel Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Right">
+                            <Button x:Name="InsertExamDataButton"
+                                    Visibility="Collapsed"
+                                    Style="{StaticResource MedButtonSecondary}"
+                                    MinWidth="140"
+                                    Click="InsertExamDataButton_OnClick"
+                                    Content="Inserir dados do exame" />
+                            <Button x:Name="SaveClinicalNoteButton"
+                                    Style="{StaticResource MedButtonPrimary}"
+                                    MinWidth="90"
+                                    Click="SaveClinicalNoteButton_OnClick"
+                                    Content="Salvar" />
+                            <Button x:Name="CopyClinicalNoteButton"
+                                    Style="{StaticResource MedButtonAccent}"
+                                    MinWidth="140"
+                                    Margin="0"
+                                    Click="CopyClinicalNoteButton_OnClick"
+                                    Content="Copiar" />
+                        </WrapPanel>
+                    </Grid>
+
+                    <TextBox x:Name="ClinicalNoteTextBox"
+                             Grid.Row="8"
+                             Padding="12,10"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             FontSize="14"
+                             GotFocus="ClinicalNoteTextBox_OnGotFocus"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled"
+                             Background="{StaticResource MedSurfaceBrush}"
+                             BorderBrush="{StaticResource MedBorderBrush}"
+                             BorderThickness="1"
+                             Foreground="{StaticResource MedTextPrimaryBrush}"
+                             Text="Escreva aqui a evolucao clinica, conduta e observacoes do paciente." />
+
+                    <TextBlock x:Name="ClinicalNoteStatusText"
+                               Grid.Row="10"
+                               Style="{StaticResource MedCaption}"
+                               Text="Informe o ID do paciente para salvar o prontuario." />
                 </Grid>
             </Border>
         </Grid>

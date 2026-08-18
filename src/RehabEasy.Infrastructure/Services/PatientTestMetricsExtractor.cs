@@ -12,6 +12,7 @@ public static class PatientTestMetricsExtractor
         {
             PatientRecordHelper.TestTypeCvTug => BuildCvTugSummary(rawPayloadJson),
             PatientRecordHelper.TestTypeEquilibrio => BuildEquilibrioSummary(rawPayloadJson),
+            PatientRecordHelper.TestTypeIndexIndex => BuildIndexIndexSummary(rawPayloadJson),
             _ => "Indicadores nao mapeados para este tipo de teste."
         };
     }
@@ -134,6 +135,55 @@ public static class PatientTestMetricsExtractor
         }
 
         return parts.Count == 0 ? "Sem indicadores de equilibrio disponiveis." : string.Join(" | ", parts);
+    }
+
+    private static string BuildIndexIndexSummary(string rawPayloadJson)
+    {
+        List<string> parts = [];
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(rawPayloadJson);
+            JsonElement root = document.RootElement;
+
+            if (TryGetProperty(root, "assessment", out JsonElement assessment))
+            {
+                if (TryGetProperty(assessment, "derived_metrics", out JsonElement derivedMetrics))
+                {
+                    AddDoubleMetric(
+                        parts,
+                        "Distancia final",
+                        TryGetDouble(derivedMetrics, "final_fingertip_distance_mm"),
+                        " mm");
+                    AddDoubleMetric(
+                        parts,
+                        "Osc. geral",
+                        TryGetDouble(derivedMetrics, "overall_oscillation_sd_mm"),
+                        " mm");
+                    AddDoubleMetric(
+                        parts,
+                        "Assimetria",
+                        TryGetDouble(derivedMetrics, "asymmetry_ratio"),
+                        "x");
+                }
+
+                if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags) &&
+                    TryGetProperty(automatedFlags, "hand_asymmetry", out JsonElement asymmetry))
+                {
+                    string? status = TryGetString(asymmetry, "status");
+                    if (!string.IsNullOrWhiteSpace(status))
+                    {
+                        parts.Add($"Assimetria: {status}");
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return "Nao foi possivel extrair indicadores Index-Index.";
+        }
+
+        return parts.Count == 0 ? "Sem indicadores Index-Index disponiveis." : string.Join(" | ", parts);
     }
 
     private static void AddDoubleMetric(List<string> parts, string label, double? value, string suffix)

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.rehabeasy.ui.PdfPreviewPane?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/25"
+            xmlns:fx="http://javafx.com/fxml/1"
+            styleClass="app-root">
+    <top>
+        <HBox styleClass="app-header" spacing="16">
+            <VBox spacing="2">
+                <Label text="RehabEasy" styleClass="app-title"/>
+                <Label text="Prontuario clinico e indicadores de reabilitacao"
+                       styleClass="app-subtitle"/>
+            </VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="Ambiente clinico local" styleClass="environment-badge"/>
+        </HBox>
+    </top>
+
+    <center>
+        <HBox spacing="14" styleClass="main-layout">
+            <VBox prefWidth="280" minWidth="240" spacing="10" styleClass="card sidebar">
+                <Label text="PACIENTE" styleClass="field-label"/>
+                <TextField fx:id="patientIdField"
+                           maxWidth="1.7976931348623157E308"
+                           promptText="ID do paciente"/>
+                <Button fx:id="refreshButton"
+                        text="Atualizar"
+                        maxWidth="1.7976931348623157E308"
+                        onAction="#onRefresh"
+                        styleClass="primary-button"/>
+                <Label fx:id="statusLabel"
+                       text="Clique em Atualizar para buscar novos registros."
+                       wrapText="true"
+                       styleClass="caption"/>
+                <ComboBox fx:id="dateSortComboBox"
+                          maxWidth="1.7976931348623157E308"/>
+                <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
+                    <Tab text="Registros">
+                        <ListView fx:id="recordsList"/>
+                    </Tab>
+                    <Tab text="Historico">
+                        <VBox spacing="8" styleClass="tab-content">
+                            <Label fx:id="historySummaryLabel"
+                                   text="Informe o ID do paciente para ver o historico."
+                                   wrapText="true"
+                                   styleClass="caption"/>
+                            <ListView fx:id="timelineList" VBox.vgrow="ALWAYS"/>
+                            <HBox spacing="6">
+                                <Button text="Gerar relatorio"
+                                        onAction="#onGenerateHistoryReport"
+                                        styleClass="secondary-button"/>
+                                <Button text="Copiar historico"
+                                        onAction="#onCopyHistoryReport"
+                                        styleClass="accent-button"/>
+                            </HBox>
+                        </VBox>
+                    </Tab>
+                </TabPane>
+                <Button text="Apagar registro selecionado"
+                        onAction="#onDeleteRecord"
+                        styleClass="danger-button"/>
+            </VBox>
+
+            <VBox HBox.hgrow="ALWAYS" minWidth="420" spacing="10" styleClass="card pdf-column">
+                <Label text="PDF do exame" styleClass="page-title"/>
+                <Label text="Documento original em destaque."
+                       styleClass="caption"/>
+                <PdfPreviewPane fx:id="pdfPreview" VBox.vgrow="ALWAYS"/>
+                <Label fx:id="recordTitleLabel"
+                       text="Nenhum registro selecionado"
+                       styleClass="section-title"/>
+                <Label fx:id="recordMetaLabel"
+                       text="Selecione um registro na lista para ver o exame."
+                       styleClass="caption"
+                       wrapText="true"/>
+                <TextArea fx:id="recordBodyArea"
+                          editable="false"
+                          wrapText="true"
+                          prefRowCount="5"
+                          VBox.vgrow="NEVER"/>
+            </VBox>
+
+            <VBox prefWidth="430" minWidth="360" spacing="10" styleClass="card clinical-column">
+                <Label text="Indicadores clinicos" styleClass="page-title"/>
+                <Label text="Resumo visual do exame selecionado."
+                       styleClass="caption"/>
+                <VBox spacing="8" styleClass="summary-card">
+                    <Label fx:id="summaryTitleLabel" text="Resumo" styleClass="section-title"/>
+                    <HBox spacing="8">
+                        <VBox HBox.hgrow="ALWAYS" styleClass="metric-card">
+                            <Label fx:id="averageTimeLabel" text="--" styleClass="metric-value"/>
+                            <Label fx:id="primaryMetricLabel"
+                                   text="Indicador principal"
+                                   styleClass="metric-label"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" styleClass="metric-card">
+                            <Label fx:id="testsCountLabel" text="0" styleClass="metric-value"/>
+                            <Label text="Registros" styleClass="metric-label"/>
+                        </VBox>
+                        <VBox HBox.hgrow="ALWAYS" styleClass="metric-card">
+                            <Label fx:id="riskLabel" text="--" styleClass="metric-risk"/>
+                            <Label text="Alerta" styleClass="metric-label"/>
+                        </VBox>
+                    </HBox>
+                    <ProgressBar fx:id="clinicalProgressBar"
+                                 progress="0"
+                                 maxWidth="1.7976931348623157E308"/>
+                    <Label fx:id="statusIndicatorLabel" text="--" styleClass="status-indicator"/>
+                </VBox>
+
+                <VBox spacing="8" styleClass="chart-card" VBox.vgrow="ALWAYS">
+                    <Label fx:id="chartPanelTitleLabel"
+                           text="Graficos do exame"
+                           styleClass="section-title"/>
+                    <BarChart fx:id="clinicalChart"
+                              animated="false"
+                              legendVisible="false"
+                              categoryGap="18"
+                              barGap="3"
+                              VBox.vgrow="ALWAYS">
+                        <xAxis>
+                            <CategoryAxis label="Indicador"/>
+                        </xAxis>
+                        <yAxis>
+                            <NumberAxis label="Valor" forceZeroInRange="true"/>
+                        </yAxis>
+                    </BarChart>
+                    <Label fx:id="chartLegendLabel"
+                           text="Selecione um exame para ver os graficos."
+                           wrapText="true"
+                           styleClass="caption"/>
+                    <Label fx:id="chartNotesLabel"
+                           text="Aguardando registros importados da API."
+                           wrapText="true"
+                           styleClass="caption"/>
+                </VBox>
+
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Label text="Prontuario" styleClass="section-title" HBox.hgrow="ALWAYS"/>
+                    <Button text="Inserir exame"
+                            onAction="#onInsertExamData"
+                            styleClass="secondary-button"/>
+                    <Button text="Salvar"
+                            onAction="#onSaveClinicalNote"
+                            styleClass="primary-button"/>
+                    <Button text="Copiar"
+                            onAction="#onCopyClinicalNote"
+                            styleClass="accent-button"/>
+                </HBox>
+                <TextArea fx:id="clinicalNoteArea"
+                          promptText="Escreva aqui a evolucao clinica, conduta e observacoes do paciente."
+                          wrapText="true"
+                          VBox.vgrow="ALWAYS"/>
+                <Label fx:id="clinicalNoteStatusLabel"
+                       text="Informe o ID do paciente para salvar o prontuario."
+                       wrapText="true"
+                       styleClass="caption"/>
+            </VBox>
+        </HBox>
+    </center>
+</BorderPane>

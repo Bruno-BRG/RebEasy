@@ -75,6 +75,15 @@ internal static class PayloadRecordMapper
 
     private static string BuildPlainTextContent(JsonElement record, string summary, string rawJson)
     {
+        if (IsIndexIndexRecord(record))
+        {
+            string indexIndexContent = BuildIndexIndexPlainTextContent(record, summary);
+            if (!string.IsNullOrWhiteSpace(indexIndexContent))
+            {
+                return indexIndexContent;
+            }
+        }
+
         if (IsEquilibrioRecord(record))
         {
             string equilibrioContent = BuildEquilibrioPlainTextContent(record, summary);
@@ -94,6 +103,31 @@ internal static class PayloadRecordMapper
         }
 
         return GetString(record, ContentKeys) ?? summary;
+    }
+
+    private static bool IsIndexIndexRecord(JsonElement record)
+    {
+        string? sender = GetString(record, SenderKeys);
+        if (string.Equals(sender, "Index-Index", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sender, "index-index", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!TryGetProperty(record, "assessment", out JsonElement assessment))
+        {
+            return false;
+        }
+
+        string? testType = GetString(assessment, "test_type");
+        if (!string.IsNullOrWhiteSpace(testType) &&
+            testType.Contains("index", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return TryGetProperty(assessment, "metrics", out JsonElement metrics) &&
+               TryGetProperty(metrics, "final_fingertip_distance_mm", out _);
     }
 
     private static bool IsEquilibrioRecord(JsonElement record)
@@ -220,6 +254,150 @@ internal static class PayloadRecordMapper
         }
 
         return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
+    }
+
+    private static string BuildIndexIndexPlainTextContent(JsonElement record, string summary)
+    {
+        List<string> sections = [];
+
+        if (!string.IsNullOrWhiteSpace(summary))
+        {
+            sections.Add(summary.Trim());
+        }
+
+        string? narrative = GetString(record, ContentKeys);
+        if (!string.IsNullOrWhiteSpace(narrative))
+        {
+            sections.Add(narrative.Trim());
+        }
+
+        if (TryGetProperty(record, "patient", out JsonElement patient))
+        {
+            List<string> patientParts = [];
+            AddLabeledValue(patientParts, "Paciente", GetString(patient, "name"));
+            AddLabeledValue(patientParts, "Idade", TryGetIntString(patient, "age_years"));
+            AddLabeledValue(patientParts, "Sexo", GetString(patient, "sex"));
+            AddLabeledValue(patientParts, "ID Exame", GetString(patient, "external_id"));
+
+            if (patientParts.Count > 0)
+            {
+                sections.Add("Paciente:\n" + string.Join('\n', patientParts));
+            }
+        }
+
+        if (TryGetProperty(record, "assessment", out JsonElement assessment))
+        {
+            List<string> headerLines = [];
+            AddLabeledValue(headerLines, "Data do exame", GetString(assessment, "performed_at"));
+            AddLabeledValue(headerLines, "ID exame", GetString(assessment, "exam_id"));
+
+            if (TryGetProperty(assessment, "protocol", out JsonElement protocol))
+            {
+                AddLabeledValue(headerLines, "Protocolo", GetString(protocol, "description"));
+                AddLabeledValue(headerLines, "Criterio", GetString(protocol, "closing_criterion"));
+                AddLabeledValue(
+                    headerLines,
+                    "Limiar de toque",
+                    TryGetDoubleString(protocol, "touch_threshold_mm"),
+                    " mm");
+            }
+
+            if (headerLines.Count > 0)
+            {
+                sections.Add(string.Join('\n', headerLines));
+            }
+
+            if (TryGetProperty(assessment, "metrics", out JsonElement metrics))
+            {
+                List<string> metricLines = [];
+                AddLabeledValue(
+                    metricLines,
+                    "- Distancia final",
+                    TryGetDoubleString(metrics, "final_fingertip_distance_mm"),
+                    " mm");
+                AddLabeledValue(
+                    metricLines,
+                    "- Duracao",
+                    TryGetDoubleString(metrics, "movement_duration_seconds"),
+                    " s");
+                AddLabeledValue(
+                    metricLines,
+                    "- Oscilacao esquerda (DP)",
+                    TryGetDoubleString(metrics, "left_hand_oscillation_sd_mm"),
+                    " mm");
+                AddLabeledValue(
+                    metricLines,
+                    "- Oscilacao direita (DP)",
+                    TryGetDoubleString(metrics, "right_hand_oscillation_sd_mm"),
+                    " mm");
+                AddLabeledValue(
+                    metricLines,
+                    "- Oscilacao geral (DP)",
+                    TryGetDoubleString(metrics, "overall_oscillation_sd_mm"),
+                    " mm");
+
+                if (metricLines.Count > 0)
+                {
+                    sections.Add("Metricas:\n" + string.Join('\n', metricLines));
+                }
+            }
+
+            List<string> flagLines = BuildIndexIndexFlagLines(assessment);
+            if (flagLines.Count > 0)
+            {
+                sections.Add("Sinalizadores:\n" + string.Join('\n', flagLines));
+            }
+
+            string? interpretation = GetString(assessment, "interpretation");
+            if (!string.IsNullOrWhiteSpace(interpretation))
+            {
+                sections.Add("Interpretacao:\n" + interpretation.Trim());
+            }
+        }
+
+        return string.Join("\n\n", sections.Where(section => !string.IsNullOrWhiteSpace(section)));
+    }
+
+    private static List<string> BuildIndexIndexFlagLines(JsonElement assessment)
+    {
+        List<string> lines = [];
+
+        if (!TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+        {
+            return lines;
+        }
+
+        if (TryGetProperty(automatedFlags, "touch_within_threshold", out JsonElement touchFlag))
+        {
+            string? value = ValueToString(touchFlag);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                lines.Add($"- Toque dentro do limiar: {value}");
+            }
+        }
+
+        if (TryGetProperty(automatedFlags, "hand_asymmetry", out JsonElement asymmetry))
+        {
+            string? status = GetString(asymmetry, "status");
+            string? ratio = TryGetDoubleString(asymmetry, "ratio");
+            string? side = GetString(asymmetry, "dominant_side");
+
+            if (!string.IsNullOrWhiteSpace(status) && !string.IsNullOrWhiteSpace(ratio))
+            {
+                string sideLabel = string.Equals(side, "right", StringComparison.OrdinalIgnoreCase)
+                    ? "direita"
+                    : string.Equals(side, "left", StringComparison.OrdinalIgnoreCase)
+                        ? "esquerda"
+                        : side ?? "--";
+                lines.Add($"- Assimetria entre maos: {status} (razao {ratio}; predominio {sideLabel})");
+            }
+            else if (!string.IsNullOrWhiteSpace(status))
+            {
+                lines.Add($"- Assimetria entre maos: {status}");
+            }
+        }
+
+        return lines;
     }
 
     private static string BuildEquilibrioPlainTextContent(JsonElement record, string summary)

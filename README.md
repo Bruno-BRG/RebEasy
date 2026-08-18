@@ -50,3 +50,17 @@ dotnet run --project .\src\RehabEasy.App\RehabEasy.App.csproj
 ```
 
 Depois de abrir o app, clique em `Atualizar` para buscar e consumir automaticamente o proximo payload pendente na API.
+
+## Desktop Java 25
+
+O novo desktop JavaFX fica em [`java/`](java/). Ele mantém a API FastAPI em
+`../vercel-api`, o contrato de payloads e o SQLite local compatível com o
+aplicativo C#:
+
+```powershell
+cd .\java
+.\mvnw.cmd test
+.\mvnw.cmd javafx:run
+```
+
+O C# permanece disponível durante a validação e a troca final.

@@ -1,0 +1,57 @@
+{
+  "source": "cvtug",
+  "schema_version": "1.1",
+  "report_type": "TUG",
+  "records": [
+    {
+      "id": "spook-cvtug-001",
+      "title": "Spook CvTUG Teste 001",
+      "sender": "CvTUG",
+      "recipient": "RehabEasy",
+      "created_at": "2026-06-09T14:30:00Z",
+      "summary": "SPOOK teste CvTUG: normal 10.4s; motora 13.5s; cognitiva 13.7s; pior DTC 32%.",
+      "content": "SPOOK payload de teste do CvTUG.",
+      "tags": ["cvtug", "teste-api"],
+      "patient": {
+        "name": "Jose Garcia",
+        "age_years": 54,
+        "sex": "Masculino",
+        "external_id": "20251121100833"
+      },
+      "assessment": {
+        "performed_at": "2026-06-09T14:30:00Z",
+        "conditions": [
+          {
+            "code": "normal",
+            "label": "Normal",
+            "total_seconds": 10.4,
+            "dual_task_cost_percent": null,
+            "phases": {"stand_seconds": 2.1, "walk_seconds": 6.1, "sit_seconds": 2.2}
+          },
+          {
+            "code": "motor",
+            "label": "Motora",
+            "total_seconds": 13.5,
+            "dual_task_cost_percent": 30,
+            "phases": {"stand_seconds": 4.2, "walk_seconds": 6.6, "sit_seconds": 2.8}
+          },
+          {
+            "code": "cognitive",
+            "label": "Cognitiva",
+            "total_seconds": 13.7,
+            "dual_task_cost_percent": 32,
+            "phases": {"stand_seconds": 2.9, "walk_seconds": 7.5, "sit_seconds": 3.3}
+          }
+        ],
+        "derived_metrics": {
+          "worst_dual_task_cost_percent": 32,
+          "normal_walk_speed_mps": 0.94
+        },
+        "automated_flags": {
+          "dual_task_cost": {"status": "ALERTA", "worst_percent": 32},
+          "gait_speed": {"normal_condition_mps": 0.94, "note": "Velocidade discretamente baixa."}
+        }
+      }
+    }
+  ]
+}

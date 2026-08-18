@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using RehabEasy.Domain.Contracts;
 using RehabEasy.Domain.Models;
 using RehabEasy.Infrastructure.Services;
@@ -327,12 +328,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (string.Equals(PatientIdTextBox.Text.Trim(), patientExternalId, StringComparison.OrdinalIgnoreCase))
+        // Atualiza o contexto clinico do paciente selecionado sem filtrar a lista geral.
+        // O filtro por ID so muda quando o usuario edita o campo e sai dele.
+        if (!string.Equals(PatientIdTextBox.Text.Trim(), patientExternalId, StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            PatientIdTextBox.Text = patientExternalId;
         }
 
-        PatientIdTextBox.Text = patientExternalId;
         _ = LoadClinicalNoteForCurrentPatientAsync();
         _ = LoadPatientHistoryAsync();
     }
@@ -403,9 +405,15 @@ public partial class MainWindow : Window
         builder.AppendLine($"{SummaryTitleText.Text}: {AverageTimeText.Text} ({PrimaryMetricLabelText.Text})");
         builder.AppendLine($"Registros: {TestsCountText.Text}");
         builder.AppendLine($"Alerta: {RiskText.Text}");
-        builder.AppendLine($"{DtcLabelText.Text}: {DtcText.Text}");
-        builder.AppendLine($"{SpeedLabelText.Text}: {SpeedText.Text}");
         builder.AppendLine($"Status: {StatusIndicatorText.Text}");
+
+        if (MainChartBars.ItemsSource is IEnumerable<ClinicalBarChartItem> bars)
+        {
+            foreach (ClinicalBarChartItem bar in bars)
+            {
+                builder.AppendLine($"{bar.Label}: {bar.ValueLabel}");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(ChartNotesText.Text))
         {
@@ -593,29 +601,55 @@ public partial class MainWindow : Window
 
         RefreshButton.IsEnabled = false;
         RefreshButton.Content = "Atualizando...";
-        StatusText.Text = "Buscando proximo payload pendente na API...";
+        StatusText.Text = "Buscando payloads pendentes na API...";
 
         try
         {
-            ApiPayloadImportResult? result = await _payloadImportService.ImportNextPayloadAsync(CancellationToken.None);
-            if (result is null)
+            // Mostra a lista geral (todos os pacientes) apos a sincronizacao.
+            PatientIdTextBox.Text = string.Empty;
+            ClinicalNoteTextBox.Text = ClinicalNotePlaceholder;
+            ClinicalNoteStatusText.Text = "Informe o ID do paciente para carregar o prontuario.";
+            _currentPatientHistory = null;
+            _lastHistoryReport = string.Empty;
+            PatientHistorySummaryText.Text = "Informe o ID do paciente para ver o historico.";
+            PatientTimelineList.ItemsSource = Array.Empty<PatientTimelineItem>();
+
+            IReadOnlyList<ApiPayloadImportResult> results =
+                await _payloadImportService.ImportAllPendingPayloadsAsync(CancellationToken.None);
+
+            if (results.Count == 0)
             {
                 await LoadLocalRecordsAsync();
-                StatusText.Text = "Nenhum payload novo pendente na API.";
+                MessagesList.SelectedIndex = -1;
+                StatusText.Text =
+                    $"Nenhum payload novo pendente. Lista geral: {_currentRecords.Count} registros locais.";
                 return;
             }
 
-            await _recordStore.SaveRecordsAsync(result.Records, CancellationToken.None);
+            List<RehabEasyRecord> importedRecords = [];
+            int pdfCount = 0;
+            foreach (ApiPayloadImportResult result in results)
+            {
+                await _recordStore.SaveRecordsAsync(result.Records, CancellationToken.None);
+                importedRecords.AddRange(result.Records);
+                if (!string.IsNullOrWhiteSpace(result.PdfLocalPath))
+                {
+                    pdfCount++;
+                }
+            }
 
             await LoadLocalRecordsAsync();
-            MessagesList.SelectedIndex = result.Records.Count > 0 ? 0 : -1;
-            await LoadPatientHistoryAsync();
+            MessagesList.SelectedIndex = -1;
+            SubjectText.Text = "Nenhum registro selecionado";
+            MetaText.Text = "Selecione um registro na lista para ver o exame, PDF e graficos.";
+            BodyText.Text = "Os dados do exame aparecem aqui.";
+            UpdateCharts(null);
+            await ClearPdfAsync();
 
-            StatusText.Text = $"Payload {result.PayloadId} importado de {result.SourceName}: {result.Records.Count} registros gravados.";
-            if (!string.IsNullOrWhiteSpace(result.PdfLocalPath))
-            {
-                StatusText.Text += " PDF salvo localmente.";
-            }
+            StatusText.Text =
+                $"{results.Count} payload(s) importado(s), {importedRecords.Count} registro(s), " +
+                $"{pdfCount} PDF(s). Lista geral com {_currentRecords.Count} registros. " +
+                "Selecione um exame ou filtre pelo ID do paciente.";
         }
         catch (Exception exception)
         {
@@ -744,13 +778,36 @@ public partial class MainWindow : Window
             AverageTimeText.Text = "--";
             RiskText.Text = "--";
             TugProgressBar.Value = 0;
-            DtcProgressBar.Value = 0;
-            DtcText.Text = "--";
-            SpeedProgressBar.Value = 0;
-            SpeedText.Text = "--";
-            StatusProgressBar.Value = 0;
             StatusIndicatorText.Text = "--";
             ChartNotesText.Text = "Aguardando registros importados da API.";
+            RenderChartBars([]);
+            return;
+        }
+
+        if (TryExtractIndexIndexMetrics(record.RawPayloadJson, out IndexIndexMetrics indexIndexMetrics))
+        {
+            ApplyIndexIndexChartLabels();
+            AverageTimeText.Text = indexIndexMetrics.FinalDistanceMm is double distance
+                ? $"{distance:0.#} mm"
+                : "--";
+            TugProgressBar.Maximum = Math.Max(indexIndexMetrics.TouchThresholdMm ?? 15, 15);
+            TugProgressBar.Value = Math.Clamp(
+                indexIndexMetrics.FinalDistanceMm ?? 0,
+                0,
+                TugProgressBar.Maximum);
+            RiskText.Text = string.IsNullOrWhiteSpace(indexIndexMetrics.AsymmetryStatus)
+                ? "--"
+                : indexIndexMetrics.AsymmetryStatus;
+            StatusIndicatorText.Text = indexIndexMetrics.HasAlert ? "Alerta" : "OK";
+            StatusIndicatorText.Foreground = indexIndexMetrics.HasAlert
+                ? (Brush)FindResource("MedWarningBrush")
+                : (Brush)FindResource("MedPrimaryBrush");
+            ChartNotesText.Text = string.IsNullOrWhiteSpace(indexIndexMetrics.InterpretationNote)
+                ? "Indicadores extraidos do relatorio Index-Index selecionado."
+                : indexIndexMetrics.InterpretationNote;
+            ChartLegendText.Text =
+                "Barras: oscilacao (DP) por mao e geral. Distancia final vs limiar de toque.";
+            RenderChartBars(BuildIndexIndexBars(indexIndexMetrics));
             return;
         }
 
@@ -760,28 +817,19 @@ public partial class MainWindow : Window
             AverageTimeText.Text = equilibrioMetrics.SplMm is double spl ? $"{spl:0.#} mm" : "--";
             TugProgressBar.Maximum = 500;
             TugProgressBar.Value = Math.Clamp(equilibrioMetrics.SplMm ?? 0, 0, 500);
-
             RiskText.Text = string.IsNullOrWhiteSpace(equilibrioMetrics.VisualDependencyStatus)
                 ? "--"
                 : equilibrioMetrics.VisualDependencyStatus;
-
-            DtcProgressBar.Maximum = 4;
-            DtcProgressBar.Value = Math.Clamp(equilibrioMetrics.RombergAreaQuotient ?? 0, 0, 4);
-            DtcText.Text = equilibrioMetrics.RombergAreaQuotient is double romberg
-                ? $"{romberg:0.##}"
-                : "--";
-
-            SpeedProgressBar.Maximum = 30;
-            SpeedProgressBar.Value = Math.Clamp(equilibrioMetrics.MeanOscillationVelocityMmS ?? 0, 0, 30);
-            SpeedText.Text = equilibrioMetrics.MeanOscillationVelocityMmS is double velocity
-                ? $"{velocity:0.##}"
-                : "--";
-
-            StatusProgressBar.Value = equilibrioMetrics.HasAlert ? 100 : 35;
             StatusIndicatorText.Text = equilibrioMetrics.HasAlert ? "Alerta" : "OK";
+            StatusIndicatorText.Foreground = equilibrioMetrics.HasAlert
+                ? (Brush)FindResource("MedWarningBrush")
+                : (Brush)FindResource("MedPrimaryBrush");
             ChartNotesText.Text = string.IsNullOrWhiteSpace(equilibrioMetrics.InterpretationNote)
                 ? "Indicadores extraidos do relatorio de equilibrio selecionado."
                 : equilibrioMetrics.InterpretationNote;
+            ChartLegendText.Text =
+                "Barras: SPL, area da elipse, velocidade e Romberg (limite tipico 2.0).";
+            RenderChartBars(BuildEquilibrioBars(equilibrioMetrics));
             return;
         }
 
@@ -800,17 +848,16 @@ public partial class MainWindow : Window
         }
 
         RiskText.Text = string.IsNullOrWhiteSpace(metrics.DualTaskStatus) ? "--" : metrics.DualTaskStatus;
-        DtcProgressBar.Maximum = 100;
-        DtcProgressBar.Value = Math.Clamp(metrics.WorstDualTaskCostPercent ?? 0, 0, 100);
-        DtcText.Text = metrics.WorstDualTaskCostPercent is double dtc ? $"{dtc:0}%" : "--";
-        SpeedProgressBar.Maximum = 2;
-        SpeedProgressBar.Value = Math.Clamp(metrics.NormalWalkSpeedMps ?? 0, 0, 2);
-        SpeedText.Text = metrics.NormalWalkSpeedMps is double speed ? $"{speed:0.00}" : "--";
-        StatusProgressBar.Value = metrics.HasAlert ? 100 : 35;
         StatusIndicatorText.Text = metrics.HasAlert ? "Alerta" : "OK";
+        StatusIndicatorText.Foreground = metrics.HasAlert
+            ? (Brush)FindResource("MedWarningBrush")
+            : (Brush)FindResource("MedPrimaryBrush");
         ChartNotesText.Text = string.IsNullOrWhiteSpace(metrics.WalkSpeedNote)
             ? "Indicadores extraidos do payload selecionado."
             : metrics.WalkSpeedNote;
+        ChartLegendText.Text =
+            "Barras: tempos TUG (Normal/Motora/Cognitiva) e DTC pior em %.";
+        RenderChartBars(BuildCvTugBars(metrics));
     }
 
     private void ResetChartLabels()
@@ -818,11 +865,10 @@ public partial class MainWindow : Window
         SummaryTitleText.Text = "Resumo";
         PrimaryMetricLabelText.Text = "Indicador principal";
         PrimaryMetricReferenceText.Text = "Referencia visual conforme o tipo de exame.";
-        DtcLabelText.Text = "Indicador 1";
-        SpeedLabelText.Text = "Indicador 2";
+        ChartPanelTitleText.Text = "Graficos do exame";
+        ChartLegendText.Text = "Selecione um exame para ver os graficos.";
         TugProgressBar.Maximum = 20;
-        DtcProgressBar.Maximum = 100;
-        SpeedProgressBar.Maximum = 2;
+        StatusIndicatorText.Foreground = (Brush)FindResource("MedTextPrimaryBrush");
     }
 
     private void ApplyCvTugChartLabels()
@@ -830,8 +876,7 @@ public partial class MainWindow : Window
         SummaryTitleText.Text = "Resumo TUG";
         PrimaryMetricLabelText.Text = "Tempo normal";
         PrimaryMetricReferenceText.Text = "Referencia visual: 0 a 20 segundos";
-        DtcLabelText.Text = "DTC pior";
-        SpeedLabelText.Text = "Velocidade";
+        ChartPanelTitleText.Text = "Tempos e custo dual-task";
     }
 
     private void ApplyEquilibrioChartLabels()
@@ -839,8 +884,209 @@ public partial class MainWindow : Window
         SummaryTitleText.Text = "Resumo Equilibrio";
         PrimaryMetricLabelText.Text = "SPL (mm)";
         PrimaryMetricReferenceText.Text = "Referencia visual: 0 a 500 mm";
-        DtcLabelText.Text = "Romberg area";
-        SpeedLabelText.Text = "Velocidade mm/s";
+        ChartPanelTitleText.Text = "Indices posturograficos";
+    }
+
+    private void ApplyIndexIndexChartLabels()
+    {
+        SummaryTitleText.Text = "Resumo Index-Index";
+        PrimaryMetricLabelText.Text = "Distancia final (mm)";
+        PrimaryMetricReferenceText.Text = "Referencia visual: limiar de toque do exame";
+        ChartPanelTitleText.Text = "Oscilacao e toque";
+    }
+
+    private void RenderChartBars(IReadOnlyList<ClinicalBarChartItem> bars)
+    {
+        MainChartBars.ItemsSource = bars;
+    }
+
+    private IReadOnlyList<ClinicalBarChartItem> BuildCvTugBars(CvTugMetrics metrics)
+    {
+        const double chartMaxHeight = 110;
+        Brush primary = (Brush)FindResource("MedPrimaryBrush");
+        Brush accent = (Brush)FindResource("MedAccentBrush");
+        Brush warning = (Brush)FindResource("MedWarningBrush");
+
+        List<(string Label, double? Value, string Suffix, Brush Fill, string Tip)> series =
+        [
+            ("Normal", metrics.NormalTotalSeconds, "s", primary, "Tempo total na condicao Normal"),
+            ("Motora", metrics.MotorTotalSeconds, "s", accent, "Tempo total na condicao Motora"),
+            ("Cognitiva", metrics.CognitiveTotalSeconds, "s", accent, "Tempo total na condicao Cognitiva"),
+            ("DTC", metrics.WorstDualTaskCostPercent, "%", warning, "Pior dual-task cost entre as condicoes")
+        ];
+
+        double maxValue = series
+            .Select(item => item.Value ?? 0)
+            .DefaultIfEmpty(1)
+            .Max();
+        maxValue = Math.Max(maxValue, 1);
+
+        return series
+            .Select(item =>
+            {
+                double value = item.Value ?? 0;
+                return new ClinicalBarChartItem
+                {
+                    Label = item.Label,
+                    ValueLabel = item.Value is double parsed
+                        ? $"{parsed:0.#}{item.Suffix}"
+                        : "--",
+                    BarHeight = Math.Max(6, chartMaxHeight * (value / maxValue)),
+                    Fill = item.Fill,
+                    Tooltip = item.Tip
+                };
+            })
+            .ToList();
+    }
+
+    private IReadOnlyList<ClinicalBarChartItem> BuildEquilibrioBars(EquilibrioMetrics metrics)
+    {
+        const double chartMaxHeight = 110;
+        Brush primary = (Brush)FindResource("MedPrimaryBrush");
+        Brush accent = (Brush)FindResource("MedAccentBrush");
+        Brush warning = (Brush)FindResource("MedWarningBrush");
+
+        List<(string Label, double? Value, string Format, Brush Fill, string Tip, double ScaleCap)> series =
+        [
+            ("SPL", metrics.SplMm, "0", primary, "Comprimento de trajetoria (mm)", 500),
+            ("Area", metrics.EllipseAreaMm2, "0", accent, "Area da elipse 95% (mm2)", 500),
+            ("Vel.", metrics.MeanOscillationVelocityMmS, "0.##", accent, "Velocidade media (mm/s)", 30),
+            ("Romberg", metrics.RombergAreaQuotient, "0.##", warning, "Quociente de Romberg area (limite ~2.0)", 4)
+        ];
+
+        return series
+            .Select(item =>
+            {
+                double value = item.Value ?? 0;
+                double ratio = Math.Clamp(value / Math.Max(item.ScaleCap, 0.01), 0, 1);
+                return new ClinicalBarChartItem
+                {
+                    Label = item.Label,
+                    ValueLabel = item.Value is double parsed
+                        ? parsed.ToString(item.Format)
+                        : "--",
+                    BarHeight = Math.Max(6, chartMaxHeight * ratio),
+                    Fill = item.Value is double romberg &&
+                           string.Equals(item.Label, "Romberg", StringComparison.Ordinal) &&
+                           romberg >= 2.0
+                        ? warning
+                        : item.Fill,
+                    Tooltip = item.Tip
+                };
+            })
+            .ToList();
+    }
+
+    private IReadOnlyList<ClinicalBarChartItem> BuildIndexIndexBars(IndexIndexMetrics metrics)
+    {
+        const double chartMaxHeight = 110;
+        Brush primary = (Brush)FindResource("MedPrimaryBrush");
+        Brush accent = (Brush)FindResource("MedAccentBrush");
+        Brush warning = (Brush)FindResource("MedWarningBrush");
+
+        List<(string Label, double? Value, Brush Fill, string Tip)> series =
+        [
+            ("Esq.", metrics.LeftOscillationMm, primary, "Oscilacao mao esquerda (DP)"),
+            ("Dir.", metrics.RightOscillationMm, warning, "Oscilacao mao direita (DP)"),
+            ("Geral", metrics.OverallOscillationMm, accent, "Oscilacao geral (DP)"),
+            ("Dist.", metrics.FinalDistanceMm, primary, "Distancia final entre pontas (mm)"),
+            ("Limiar", metrics.TouchThresholdMm, accent, "Limiar de toque configurado (mm)")
+        ];
+
+        double maxValue = series
+            .Select(item => item.Value ?? 0)
+            .DefaultIfEmpty(1)
+            .Max();
+        maxValue = Math.Max(maxValue, 1);
+
+        return series
+            .Select(item =>
+            {
+                double value = item.Value ?? 0;
+                return new ClinicalBarChartItem
+                {
+                    Label = item.Label,
+                    ValueLabel = item.Value is double parsed ? $"{parsed:0.#}" : "--",
+                    BarHeight = Math.Max(6, chartMaxHeight * (value / maxValue)),
+                    Fill = item.Fill,
+                    Tooltip = item.Tip
+                };
+            })
+            .ToList();
+    }
+
+    private static bool TryExtractIndexIndexMetrics(string rawPayloadJson, out IndexIndexMetrics metrics)
+    {
+        metrics = new IndexIndexMetrics();
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(rawPayloadJson);
+            JsonElement root = document.RootElement;
+
+            if (!TryGetProperty(root, "assessment", out JsonElement assessment))
+            {
+                return false;
+            }
+
+            bool looksLikeIndexIndex =
+                (TryGetProperty(assessment, "metrics", out JsonElement metricsNode) &&
+                 TryGetProperty(metricsNode, "final_fingertip_distance_mm", out _)) ||
+                string.Equals(
+                    TryGetString(assessment, "test_type"),
+                    "INDEX_INDEX",
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (!looksLikeIndexIndex)
+            {
+                return false;
+            }
+
+            if (TryGetProperty(assessment, "derived_metrics", out JsonElement derivedMetrics))
+            {
+                metrics.FinalDistanceMm = TryGetDouble(derivedMetrics, "final_fingertip_distance_mm");
+                metrics.LeftOscillationMm = TryGetDouble(derivedMetrics, "left_hand_oscillation_sd_mm");
+                metrics.RightOscillationMm = TryGetDouble(derivedMetrics, "right_hand_oscillation_sd_mm");
+                metrics.OverallOscillationMm = TryGetDouble(derivedMetrics, "overall_oscillation_sd_mm");
+            }
+
+            if (TryGetProperty(assessment, "metrics", out JsonElement rawMetrics))
+            {
+                metrics.FinalDistanceMm ??= TryGetDouble(rawMetrics, "final_fingertip_distance_mm");
+                metrics.LeftOscillationMm ??= TryGetDouble(rawMetrics, "left_hand_oscillation_sd_mm");
+                metrics.RightOscillationMm ??= TryGetDouble(rawMetrics, "right_hand_oscillation_sd_mm");
+                metrics.OverallOscillationMm ??= TryGetDouble(rawMetrics, "overall_oscillation_sd_mm");
+                metrics.TouchThresholdMm = TryGetDouble(rawMetrics, "touch_threshold_mm");
+            }
+
+            if (TryGetProperty(assessment, "protocol", out JsonElement protocol))
+            {
+                metrics.TouchThresholdMm ??= TryGetDouble(protocol, "touch_threshold_mm");
+            }
+
+            if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
+            {
+                if (TryGetProperty(automatedFlags, "hand_asymmetry", out JsonElement asymmetry))
+                {
+                    metrics.AsymmetryStatus = TryGetString(asymmetry, "status");
+                    metrics.HasAlert = metrics.AsymmetryStatus?
+                        .Contains("ALERTA", StringComparison.OrdinalIgnoreCase) == true;
+                }
+
+                bool? touchOk = TryGetBool(automatedFlags, "touch_within_threshold");
+                if (touchOk == false)
+                {
+                    metrics.HasAlert = true;
+                }
+            }
+
+            metrics.InterpretationNote = TryGetString(assessment, "interpretation");
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static bool TryExtractEquilibrioMetrics(string rawPayloadJson, out EquilibrioMetrics metrics)
@@ -861,10 +1107,12 @@ public partial class MainWindow : Window
             if (TryGetProperty(assessment, "derived_metrics", out JsonElement derivedMetrics))
             {
                 metrics.SplMm = TryGetDouble(derivedMetrics, "spl_mm");
+                metrics.EllipseAreaMm2 = TryGetDouble(derivedMetrics, "confidence_ellipse_95_area_mm2");
                 metrics.MeanOscillationVelocityMmS = TryGetDouble(
                     derivedMetrics,
                     "mean_oscillation_velocity_mm_s");
                 metrics.RombergAreaQuotient = TryGetDouble(derivedMetrics, "romberg_area_quotient");
+                metrics.ApMlRatio = TryGetDouble(derivedMetrics, "ap_ml_ratio");
             }
 
             if (TryGetProperty(assessment, "automated_flags", out JsonElement automatedFlags))
@@ -922,10 +1170,22 @@ public partial class MainWindow : Window
                     foreach (JsonElement condition in conditions.EnumerateArray())
                     {
                         string? code = TryGetString(condition, "code");
-                        if (string.Equals(code, "normal", StringComparison.OrdinalIgnoreCase) &&
-                            TryGetDouble(condition, "total_seconds") is double totalSeconds)
+                        double? totalSeconds = TryGetDouble(condition, "total_seconds");
+                        double? dtc = TryGetDouble(condition, "dual_task_cost_percent");
+
+                        if (string.Equals(code, "normal", StringComparison.OrdinalIgnoreCase))
                         {
                             metrics.NormalTotalSeconds = totalSeconds;
+                        }
+                        else if (string.Equals(code, "motor", StringComparison.OrdinalIgnoreCase))
+                        {
+                            metrics.MotorTotalSeconds = totalSeconds;
+                            metrics.MotorDualTaskCostPercent = dtc;
+                        }
+                        else if (string.Equals(code, "cognitive", StringComparison.OrdinalIgnoreCase))
+                        {
+                            metrics.CognitiveTotalSeconds = totalSeconds;
+                            metrics.CognitiveDualTaskCostPercent = dtc;
                         }
                     }
                 }
@@ -1054,6 +1314,10 @@ public partial class MainWindow : Window
     private sealed class CvTugMetrics
     {
         public double? NormalTotalSeconds { get; set; }
+        public double? MotorTotalSeconds { get; set; }
+        public double? CognitiveTotalSeconds { get; set; }
+        public double? MotorDualTaskCostPercent { get; set; }
+        public double? CognitiveDualTaskCostPercent { get; set; }
         public double? WorstDualTaskCostPercent { get; set; }
         public string? DualTaskStatus { get; set; }
         public double? NormalWalkSpeedMps { get; set; }
@@ -1064,9 +1328,23 @@ public partial class MainWindow : Window
     private sealed class EquilibrioMetrics
     {
         public double? SplMm { get; set; }
+        public double? EllipseAreaMm2 { get; set; }
         public double? MeanOscillationVelocityMmS { get; set; }
         public double? RombergAreaQuotient { get; set; }
+        public double? ApMlRatio { get; set; }
         public string? VisualDependencyStatus { get; set; }
+        public string? InterpretationNote { get; set; }
+        public bool HasAlert { get; set; }
+    }
+
+    private sealed class IndexIndexMetrics
+    {
+        public double? FinalDistanceMm { get; set; }
+        public double? TouchThresholdMm { get; set; }
+        public double? LeftOscillationMm { get; set; }
+        public double? RightOscillationMm { get; set; }
+        public double? OverallOscillationMm { get; set; }
+        public string? AsymmetryStatus { get; set; }
         public string? InterpretationNote { get; set; }
         public bool HasAlert { get; set; }
     }

@@ -1,0 +1,180 @@
+.app-root {
+    -fx-font-family: "Segoe UI";
+    -fx-background-color: #E8EEF2;
+}
+
+.app-header {
+    -fx-padding: 16 24;
+    -fx-background-color: #0E6B7A;
+    -fx-alignment: center-left;
+}
+
+.app-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.app-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: #CFE8EC;
+}
+
+.environment-badge {
+    -fx-padding: 8 14;
+    -fx-background-color: #0A5561;
+    -fx-background-radius: 18;
+    -fx-text-fill: #E6F2F4;
+    -fx-font-weight: bold;
+}
+
+.main-layout {
+    -fx-padding: 16;
+}
+
+.card {
+    -fx-padding: 18;
+    -fx-background-color: white;
+    -fx-border-color: #C5D4DC;
+    -fx-border-width: 1;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+
+.sidebar {
+    -fx-padding: 12;
+}
+
+.pdf-column,
+.clinical-column {
+    -fx-padding: 20;
+}
+
+.page-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1A2B33;
+}
+
+.section-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1A2B33;
+}
+
+.field-label,
+.metric-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #5A7180;
+}
+
+.caption {
+    -fx-font-size: 12px;
+    -fx-text-fill: #5A7180;
+}
+
+.text-field,
+.text-area,
+.combo-box,
+.list-view {
+    -fx-border-color: #C5D4DC;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.text-area {
+    -fx-font-size: 13px;
+}
+
+.button {
+    -fx-font-weight: bold;
+    -fx-padding: 9 14;
+    -fx-background-radius: 7;
+    -fx-border-radius: 7;
+    -fx-cursor: hand;
+}
+
+.primary-button {
+    -fx-background-color: #0E6B7A;
+    -fx-text-fill: white;
+}
+
+.secondary-button {
+    -fx-background-color: white;
+    -fx-border-color: #C5D4DC;
+    -fx-text-fill: #1A2B33;
+}
+
+.accent-button {
+    -fx-background-color: #1A8FA5;
+    -fx-text-fill: white;
+}
+
+.danger-button {
+    -fx-background-color: white;
+    -fx-border-color: #B54747;
+    -fx-text-fill: #B54747;
+}
+
+.summary-card,
+.chart-card,
+.metric-card {
+    -fx-padding: 12;
+    -fx-background-color: #F4F8FA;
+    -fx-border-color: #C5D4DC;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.metric-card {
+    -fx-background-color: white;
+    -fx-alignment: center;
+}
+
+.metric-value {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0E6B7A;
+}
+
+.metric-risk {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #C7772E;
+}
+
+.status-indicator {
+    -fx-font-weight: bold;
+    -fx-alignment: center;
+}
+
+.tab-content {
+    -fx-padding: 4;
+}
+
+.list-cell {
+    -fx-padding: 9 8;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-wrap-text: true;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #E6F2F4;
+    -fx-border-color: #0E6B7A;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.chart {
+    -fx-padding: 4;
+}
+
+.chart-plot-background {
+    -fx-background-color: white;
+}
+
+.default-color0.chart-bar {
+    -fx-bar-fill: #0E6B7A;
+}

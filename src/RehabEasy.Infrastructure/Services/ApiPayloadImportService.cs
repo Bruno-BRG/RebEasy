@@ -70,6 +70,26 @@ public sealed class ApiPayloadImportService : IApiPayloadImportService
         return await BuildImportResultAsync(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ApiPayloadImportResult>> ImportAllPendingPayloadsAsync(
+        CancellationToken cancellationToken)
+    {
+        const int maxPayloadsPerRefresh = 50;
+        List<ApiPayloadImportResult> imported = [];
+
+        while (imported.Count < maxPayloadsPerRefresh)
+        {
+            ApiPayloadImportResult? next = await ImportNextPayloadAsync(cancellationToken);
+            if (next is null)
+            {
+                break;
+            }
+
+            imported.Add(next);
+        }
+
+        return imported;
+    }
+
     private async Task<ApiPayloadImportResult> BuildImportResultAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)

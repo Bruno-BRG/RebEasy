@@ -1,0 +1,66 @@
+{
+  "source": "posturografia-vr",
+  "schema_version": "1.0",
+  "report_type": "EQUILIBRIO",
+  "records": [
+    {
+      "id": "equilibrio-001",
+      "title": "Equilibrio - Gaga - 10/06/2026 14:19",
+      "sender": "Posturografia VR",
+      "recipient": "RehabEasy",
+      "created_at": "2026-06-10T14:19:07-03:00",
+      "summary": "SPL 273,1 mm; area 400,3 mm2; Romberg area 2,39.",
+      "content": "Avaliacao posturografica por headset VR.",
+      "tags": ["posturografia", "equilibrio", "vr"],
+      "patient": {
+        "name": "Gaga",
+        "age_years": 45,
+        "sex": "Masculino",
+        "external_id": "20260610141907"
+      },
+      "assessment": {
+        "performed_at": "2026-06-10T14:19:07-03:00",
+        "exam_id": "20260610141907",
+        "protocol": {"description": "Olhos abertos e fechados"},
+        "posturographic_indices": [
+          {
+            "code": "spl",
+            "label": "Comprimento de trajetoria (SPL)",
+            "value": 273.1,
+            "unit": "mm",
+            "classification": "within_expected"
+          },
+          {
+            "code": "confidence_ellipse_95_area",
+            "label": "Area da elipse de confianca 95%",
+            "value": 400.3,
+            "unit": "mm2",
+            "classification": "above_expected"
+          }
+        ],
+        "romberg_quotients": [
+          {
+            "code": "area",
+            "label": "Quociente de Romberg - area (OF/OA)",
+            "value": 2.39,
+            "classification": "above_expected"
+          }
+        ],
+        "derived_metrics": {
+          "ap_ml_ratio": 0.67,
+          "spl_mm": 273.1,
+          "confidence_ellipse_95_area_mm2": 400.3,
+          "mean_oscillation_velocity_mm_s": 23.55,
+          "romberg_area_quotient": 2.39
+        },
+        "automated_flags": {
+          "increased_postural_sway": true,
+          "visual_dependency": {"status": "ALERTA", "romberg_area_quotient": 2.39},
+          "lateral_predominance": true,
+          "acquisition_warnings": ["Duracao abaixo do recomendado."]
+        },
+        "interpretation": "Romberg area elevado."
+      }
+    }
+  ]
+}
